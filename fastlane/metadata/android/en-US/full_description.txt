@@ -1,0 +1,12 @@
+Phone by Numio is a private phone app for Android, part of the Numio app family.
+
+<ul>
+<li>No internet permission: the app never goes online</li>
+<li>No ads, analytics, tracking or accounts</li>
+<li>Everything the app keeps stays on your phone</li>
+<li>Quiet Numio design with dark, light and system themes</li>
+</ul>
+
+Calls themselves still go through Android and your carrier, as with any phone app.
+
+Free and open source under the GPL-3.0.
