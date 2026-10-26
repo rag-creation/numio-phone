@@ -43,6 +43,8 @@ fun SettingsScreen(
     isDefault: Boolean,
     onSetDefault: () -> Unit,
     onOpenDefaultApps: () -> Unit,
+    canFullScreen: Boolean,
+    onAllowFullScreen: () -> Unit,
     onBack: () -> Unit,
 ) {
     Column(
@@ -82,6 +84,16 @@ fun SettingsScreen(
             )
             Spacer(Modifier.height(12.dp))
             if (isDefault) {
+                if (!canFullScreen) {
+                    Text(
+                        stringResource(R.string.full_screen_off),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Numio.colors.text,
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    FilledButton(stringResource(R.string.allow_full_screen), onAllowFullScreen)
+                    Spacer(Modifier.height(10.dp))
+                }
                 OutlineButton(stringResource(R.string.change_default), onOpenDefaultApps)
             } else {
                 FilledButton(stringResource(R.string.set_default), onSetDefault)

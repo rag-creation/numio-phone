@@ -22,6 +22,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import com.rr.numio.phone.data.AppSettings
 import com.rr.numio.phone.dialpad.DialPad
+import com.rr.numio.phone.telecom.CallNotifications
 import com.rr.numio.phone.telecom.DialerRole
 import com.rr.numio.phone.ui.PhoneApp
 import com.rr.numio.phone.ui.theme.PhonebyNumioTheme
@@ -31,6 +32,7 @@ import kotlinx.coroutines.launch
 class MainActivity : ComponentActivity() {
 
     private var isDefault by mutableStateOf(false)
+    private var canFullScreen by mutableStateOf(true)
     private var dialRequest by mutableStateOf<String?>(null)
     private var notice by mutableStateOf<String?>(null)
 
@@ -92,6 +94,10 @@ class MainActivity : ComponentActivity() {
                     isDefault = isDefault,
                     onSetDefault = { requestRole() },
                     onOpenDefaultApps = { startActivity(DialerRole.defaultAppsIntent()) },
+                    canFullScreen = canFullScreen,
+                    onAllowFullScreen = {
+                        runCatching { startActivity(CallNotifications.fullScreenSettingsIntent(this)) }
+                    },
                     dialRequest = dialRequest,
                     onDialRequestUsed = { dialRequest = null },
                     notice = notice,
@@ -104,6 +110,7 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         isDefault = DialerRole.isDefault(this)
+        canFullScreen = CallNotifications.canFullScreen(this)
         if (isDefault && notice == getString(R.string.need_default)) notice = null
     }
 

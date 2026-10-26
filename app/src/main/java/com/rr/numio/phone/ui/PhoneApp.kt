@@ -62,6 +62,8 @@ fun PhoneApp(
     isDefault: Boolean,
     onSetDefault: () -> Unit,
     onOpenDefaultApps: () -> Unit,
+    canFullScreen: Boolean,
+    onAllowFullScreen: () -> Unit,
     dialRequest: String?,
     onDialRequestUsed: () -> Unit,
     notice: String?,
@@ -91,6 +93,8 @@ fun PhoneApp(
                 isDefault = isDefault,
                 onSetDefault = onSetDefault,
                 onOpenDefaultApps = onOpenDefaultApps,
+                canFullScreen = canFullScreen,
+                onAllowFullScreen = onAllowFullScreen,
                 onBack = { showSettings = false },
             )
         } else {
