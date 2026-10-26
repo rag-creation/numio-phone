@@ -9,14 +9,14 @@ A private, offline phone app for Android. Part of the Numio family, alongside Nu
 
 Calls themselves still go through Android and your carrier, as with any phone app. "Offline" means the app itself never connects to the internet.
 
-> **Status: foundation (v0.1.0).** This version has the Numio theme, the dial pad, the page layout and settings. It can't place calls yet. That comes in the next milestone.
+> **Status: milestone 1 (in testing).** Phone by Numio can be your default phone app: it places calls and shows its own ringing and on-a-call screens, including over the lock screen. Call history and contacts come next.
 
 ## Milestones
 
 | # | Milestone | What it adds |
 |---|-----------|--------------|
-| 0 | **Foundation** (this) | Project, Numio theme (dark / light / system), dial pad, tabs, settings, tests, CI |
-| 1 | Default phone app | Ask for the default phone app role, dial intents, outgoing calls, `InCallService` with real incoming and ongoing call screens (answer, decline, mute, speaker, keypad, hold, end), call notification on the lock screen |
+| 0 | Foundation ✓ | Project, Numio theme (dark / light / system), dial pad, tabs, settings, tests, CI |
+| 1 | **Default phone app** (this) | Ask for the default phone app role, dial intents, outgoing calls, `InCallService` with real incoming and ongoing call screens (answer, decline, mute, speaker, keypad, hold, end), call notification on the lock screen |
 | 2 | Call history | Recents (incoming, outgoing, missed), call details, redial |
 | 3 | Contacts | Contact list, search, favourites, contact details |
 | 4 | Dual SIM | Choose the SIM per call, SIM labels in history |
@@ -45,19 +45,25 @@ If supporting Android 8–9 turns out to matter, it can be added later with the 
 
 ## Permissions
 
-This version asks for **no permissions at all**. Each permission below will be added only with the feature that needs it, and asked for only when you use that feature, never all at once on first launch.
+Nothing is asked for on first launch. Each permission is asked for only when you use the feature that needs it.
 
 | Permission | Milestone | Why |
 |------------|-----------|-----|
 | Default phone app role | 1 | Android only lets the default phone app show the call screens |
 | `CALL_PHONE` | 1 | Place a call |
 | `POST_NOTIFICATIONS`, `USE_FULL_SCREEN_INTENT` | 1 | Show an incoming call, including on the lock screen |
+| `WAKE_LOCK` | 1 | Turn the screen off when the phone is at your ear |
 | `READ_CALL_LOG`, `WRITE_CALL_LOG` | 2 | Show and clear call history |
 | `READ_CONTACTS` | 3 | Show names and the contact list |
 | `READ_PHONE_STATE` | 4 | List SIMs so you can choose one |
 | Call screening role | 5 | Block numbers before they ring |
 
 `INTERNET` will never be added. CI checks the release APK on every pull request and fails if it appears.
+
+## Testing it as your phone app
+
+1. Install the test APK and open it. Tap the call button on any number: Android asks whether Phone by Numio should be the default phone app. Say yes, then allow calls and notifications.
+2. Keep your old phone app installed. To switch back: **Settings → Apps → Default apps → Phone app**, or Phone by Numio's own Settings → **Change default phone app**.
 
 ## Build and test
 
@@ -90,6 +96,7 @@ Release APKs are signed by hand with the Numio key. The key is never added to Gi
 Phone by Numio is free software under the [GNU GPL v3.0 only](LICENSE).
 
 - [Inter](https://github.com/rsms/inter) font, SIL Open Font License 1.1 ([licence](licenses/Inter-OFL.txt))
+- The "Numio." wordmark uses letter shapes from [Chakra Petch](https://github.com/m4rc1e/Chakra-Petch), SIL Open Font License 1.1 ([licence](licenses/ChakraPetch-OFL.txt))
 - Icons from [Material Symbols](https://github.com/google/material-design-icons), Apache License 2.0
 
 Built by RR with help from Claude.

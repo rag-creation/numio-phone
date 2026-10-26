@@ -26,6 +26,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -55,14 +56,24 @@ import com.rr.numio.phone.ui.theme.NumberDisplay
 
 /**
  * "Halo" dial pad: thin ring keys, light digits, amber letters, and an amber
- * call button with a soft ring around it. In this version it only types the
- * number: placing calls comes with the Telecom milestone.
+ * call button with a soft ring around it.
  */
 @Composable
-fun KeypadScreen() {
+fun KeypadScreen(
+    dialRequest: String?,
+    onDialRequestUsed: () -> Unit,
+    notice: String?,
+    onCall: (String) -> Unit,
+) {
     var number by rememberSaveable { mutableStateOf("") }
-    var showNotice by rememberSaveable { mutableStateOf(false) }
     val view = LocalView.current
+    // A number handed over by another app (a tel: link) fills the keypad
+    LaunchedEffect(dialRequest) {
+        if (dialRequest != null) {
+            number = DialPad.clean(dialRequest)
+            onDialRequestUsed()
+        }
+    }
     fun tap() = view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
 
     Column(
@@ -87,7 +98,7 @@ fun KeypadScreen() {
         GlowLine(wide = number.isNotEmpty())
         Spacer(Modifier.height(10.dp))
         Text(
-            text = if (showNotice) stringResource(R.string.calling_not_yet) else "",
+            text = notice.orEmpty(),
             style = MaterialTheme.typography.bodySmall,
             color = Numio.colors.textSoft,
             textAlign = TextAlign.Center,
@@ -106,7 +117,6 @@ fun KeypadScreen() {
                         key = key,
                         onClick = {
                             tap()
-                            showNotice = false
                             number = DialPad.append(number, key.char)
                         },
                         onLongClick = if (key.char == '0') {
@@ -130,7 +140,7 @@ fun KeypadScreen() {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Spacer(Modifier.size(76.dp))
-            CallButton(onClick = { tap(); showNotice = true })
+            CallButton(onClick = { tap(); if (number.isNotEmpty()) onCall(number) })
             Box(Modifier.size(76.dp), contentAlignment = Alignment.Center) {
                 if (number.isNotEmpty()) {
                     BackspaceButton(

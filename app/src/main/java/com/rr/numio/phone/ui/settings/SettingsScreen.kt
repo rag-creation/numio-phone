@@ -1,6 +1,8 @@
 package com.rr.numio.phone.ui.settings
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,12 +33,16 @@ import com.rr.numio.phone.R
 import com.rr.numio.phone.ui.RoundIconButton
 import com.rr.numio.phone.ui.theme.Numio
 import com.rr.numio.phone.ui.theme.ThemeMode
+import com.rr.numio.phone.ui.theme.NumioWordmark
 
 @Composable
 fun SettingsScreen(
     themeMode: ThemeMode,
     onThemeMode: (ThemeMode) -> Unit,
     versionName: String,
+    isDefault: Boolean,
+    onSetDefault: () -> Unit,
+    onOpenDefaultApps: () -> Unit,
     onBack: () -> Unit,
 ) {
     Column(
@@ -68,6 +74,19 @@ fun SettingsScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 24.dp),
         ) {
+            SectionLabel(stringResource(R.string.default_phone_app))
+            Text(
+                stringResource(if (isDefault) R.string.default_yes else R.string.default_no),
+                style = MaterialTheme.typography.bodyMedium,
+                color = Numio.colors.textSoft,
+            )
+            Spacer(Modifier.height(12.dp))
+            if (isDefault) {
+                OutlineButton(stringResource(R.string.change_default), onOpenDefaultApps)
+            } else {
+                FilledButton(stringResource(R.string.set_default), onSetDefault)
+            }
+
             SectionLabel(stringResource(R.string.appearance))
             ThemeChooser(selected = themeMode, onSelect = onThemeMode)
 
@@ -79,6 +98,8 @@ fun SettingsScreen(
             )
 
             SectionLabel(stringResource(R.string.about))
+            NumioWordmark(height = 18.dp, textColor = Numio.colors.text)
+            Spacer(Modifier.height(10.dp))
             Text(
                 stringResource(R.string.app_name),
                 style = MaterialTheme.typography.bodyLarge,
@@ -91,6 +112,36 @@ fun SettingsScreen(
             )
             Spacer(Modifier.height(32.dp))
         }
+    }
+}
+
+@Composable
+private fun FilledButton(text: String, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(Numio.colors.accent)
+            .clickable(role = Role.Button, onClick = onClick)
+            .padding(vertical = 14.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(text, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = Numio.colors.onAccent)
+    }
+}
+
+@Composable
+private fun OutlineButton(text: String, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .border(1.dp, Numio.colors.ring, RoundedCornerShape(14.dp))
+            .clickable(role = Role.Button, onClick = onClick)
+            .padding(vertical = 14.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(text, style = MaterialTheme.typography.labelLarge, color = Numio.colors.text)
     }
 }
 
