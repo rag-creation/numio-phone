@@ -43,7 +43,9 @@ import com.rr.numio.phone.ui.keypad.KeypadScreen
 import com.rr.numio.phone.ui.recents.RecentsScreen
 import com.rr.numio.phone.ui.settings.SettingsScreen
 import com.rr.numio.phone.ui.theme.Numio
+import com.rr.numio.phone.ui.theme.NumioWordmark
 import com.rr.numio.phone.ui.theme.ThemeMode
+import androidx.compose.runtime.LaunchedEffect
 
 enum class Tab(@StringRes val label: Int, @DrawableRes val icon: Int) {
     RECENTS(R.string.tab_recents, R.drawable.ic_recents),
@@ -57,9 +59,23 @@ fun PhoneApp(
     themeMode: ThemeMode,
     onThemeMode: (ThemeMode) -> Unit,
     versionName: String,
+    isDefault: Boolean,
+    onSetDefault: () -> Unit,
+    onOpenDefaultApps: () -> Unit,
+    dialRequest: String?,
+    onDialRequestUsed: () -> Unit,
+    notice: String?,
+    onCall: (String) -> Unit,
 ) {
     var tab by rememberSaveable { mutableStateOf(Tab.KEYPAD) }
     var showSettings by rememberSaveable { mutableStateOf(false) }
+    // A tel: link from another app always lands on the keypad
+    LaunchedEffect(dialRequest) {
+        if (dialRequest != null) {
+            tab = Tab.KEYPAD
+            showSettings = false
+        }
+    }
 
     Box(
         Modifier
@@ -72,6 +88,9 @@ fun PhoneApp(
                 themeMode = themeMode,
                 onThemeMode = onThemeMode,
                 versionName = versionName,
+                isDefault = isDefault,
+                onSetDefault = onSetDefault,
+                onOpenDefaultApps = onOpenDefaultApps,
                 onBack = { showSettings = false },
             )
         } else {
@@ -81,12 +100,17 @@ fun PhoneApp(
                     .statusBarsPadding()
                     .navigationBarsPadding(),
             ) {
-                TopBar(title = stringResource(tab.label), onSettings = { showSettings = true })
+                TopBar(onSettings = { showSettings = true })
                 Box(Modifier.weight(1f).fillMaxWidth()) {
                     when (tab) {
                         Tab.RECENTS -> RecentsScreen()
                         Tab.CONTACTS -> ContactsScreen()
-                        Tab.KEYPAD -> KeypadScreen()
+                        Tab.KEYPAD -> KeypadScreen(
+                            dialRequest = dialRequest,
+                            onDialRequestUsed = onDialRequestUsed,
+                            notice = notice,
+                            onCall = onCall,
+                        )
                     }
                 }
                 BottomTabs(selected = tab, onSelect = { tab = it })
@@ -95,20 +119,17 @@ fun PhoneApp(
     }
 }
 
+// Quiet signature top-left: the small "Numio." wordmark, then the settings gear
 @Composable
-private fun TopBar(title: String, onSettings: () -> Unit) {
+private fun TopBar(onSettings: () -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
             .padding(start = 24.dp, end = 12.dp, top = 12.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            title,
-            style = MaterialTheme.typography.headlineSmall,
-            color = Numio.colors.text,
-            modifier = Modifier.weight(1f),
-        )
+        NumioWordmark(height = 15.dp)
+        Spacer(Modifier.weight(1f))
         RoundIconButton(
             icon = R.drawable.ic_settings,
             description = stringResource(R.string.settings),

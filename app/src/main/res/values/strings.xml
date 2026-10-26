@@ -9,7 +9,11 @@
     <string name="call">Call</string>
     <string name="backspace">Delete</string>
     <string name="back">Back</string>
-    <string name="calling_not_yet">Calling arrives in the next version. This one is the foundation.</string>
+
+    <string name="need_default">To make calls, set Phone by Numio as your default phone app.</string>
+    <string name="need_call_permission">Phone by Numio needs permission to make calls.</string>
+    <string name="role_unavailable">This phone doesn\'t let other apps be the default phone app.</string>
+    <string name="call_failed">Couldn\'t start the call. Please try again.</string>
 
     <string name="recents_empty_title">Call history comes next</string>
     <string name="recents_empty_body">Your calls will show here. Phone by Numio will ask for call log access only when this page is ready.</string>
@@ -17,6 +21,11 @@
     <string name="contacts_empty_body">Your contacts will show here. Phone by Numio will ask for contacts access only when this page is ready.</string>
 
     <string name="settings">Settings</string>
+    <string name="default_phone_app">Default phone app</string>
+    <string name="default_yes">Phone by Numio is your default phone app. Calls ring here.</string>
+    <string name="default_no">Phone by Numio isn\'t your default phone app yet, so calls ring in your other phone app.</string>
+    <string name="set_default">Set as default phone app</string>
+    <string name="change_default">Change default phone app</string>
     <string name="appearance">Appearance</string>
     <string name="theme_dark">Dark</string>
     <string name="theme_light">Light</string>
@@ -25,4 +34,36 @@
     <string name="privacy_body">No internet permission, no ads, no tracking, no accounts. Everything stays on your phone. Calls themselves still go through Android and your carrier.</string>
     <string name="about">About</string>
     <string name="version">Version %1$s</string>
+
+    <!-- Call screens -->
+    <string name="incoming_call">Incoming call</string>
+    <string name="calling">Calling…</string>
+    <string name="on_call">On call</string>
+    <string name="on_hold">On hold</string>
+    <string name="call_ended">Call ended</string>
+    <string name="choose_sim">Call with</string>
+    <string name="locked_time">Locked · %1$s</string>
+    <string name="answer">Answer</string>
+    <string name="decline">Decline</string>
+    <string name="reply_with_message">Reply with message</string>
+    <string name="silence">Silence ringing</string>
+    <string name="end_call">End call</string>
+    <string name="hang_up">Hang up</string>
+    <string name="mute">Mute</string>
+    <string name="keypad">Keypad</string>
+    <string name="speaker">Speaker</string>
+    <string name="hold">Hold</string>
+    <string name="add_call">Add call</string>
+    <string name="bluetooth">Bluetooth</string>
+    <string name="hide_keypad">Hide keypad</string>
+    <string name="other_on_hold">%1$s on hold · tap to switch</string>
+    <string-array name="quick_replies">
+        <item>Can\'t talk now. I\'ll call you back.</item>
+        <item>I\'m driving. Will call you soon.</item>
+        <item>In a meeting. Call you later.</item>
+        <item>Please text me.</item>
+    </string-array>
+
+    <string name="channel_incoming">Incoming calls</string>
+    <string name="channel_ongoing">Ongoing calls</string>
 </resources>
