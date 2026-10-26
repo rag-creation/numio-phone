@@ -34,6 +34,26 @@ object CallNotifications {
         return NotificationManagerCompat.from(context).areNotificationsEnabled()
     }
 
+    /** Android 14+ lets people turn off full-screen call notifications per app. */
+    fun canFullScreen(context: Context): Boolean =
+        if (Build.VERSION.SDK_INT >= 34) {
+            context.getSystemService(NotificationManager::class.java).canUseFullScreenIntent()
+        } else {
+            true
+        }
+
+    /** The system page where full-screen notifications can be allowed for this app. */
+    fun fullScreenSettingsIntent(context: Context): Intent =
+        if (Build.VERSION.SDK_INT >= 34) {
+            Intent(
+                android.provider.Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT,
+                android.net.Uri.parse("package:" + context.packageName),
+            )
+        } else {
+            Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, context.packageName)
+        }
+
     private fun ensureChannels(context: Context) {
         val nm = context.getSystemService(NotificationManager::class.java)
         nm.createNotificationChannel(
