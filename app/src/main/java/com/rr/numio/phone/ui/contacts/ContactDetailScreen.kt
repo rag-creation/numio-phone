@@ -59,6 +59,7 @@ fun ContactDetailScreen(
     onCall: (String) -> Unit,
     onMessage: (String) -> Unit,
     onOpenInContacts: () -> Unit,
+    onEdit: () -> Unit,
 ) {
     val context = LocalContext.current
     val today = LocalDate.now()
@@ -67,6 +68,7 @@ fun ContactDetailScreen(
             if (contact.starred) {
                 Icon(painterResource(R.drawable.ic_star), stringResource(R.string.favourite), tint = Numio.colors.accentInk, modifier = Modifier.padding(12.dp).size(22.dp))
             }
+            RingIconButton(R.drawable.ic_pencil, stringResource(R.string.edit_contact), onClick = onEdit)
         }
         LazyColumn(Modifier.fillMaxSize()) {
             item {

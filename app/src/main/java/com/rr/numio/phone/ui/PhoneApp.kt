@@ -43,6 +43,8 @@ import com.rr.numio.phone.ui.contacts.ContactDetailScreen
 import com.rr.numio.phone.ui.recents.NumberDetailScreen
 import com.rr.numio.phone.data.CallGrouping
 import com.rr.numio.phone.data.Contact
+import com.rr.numio.phone.data.ContactDraft
+import com.rr.numio.phone.ui.contacts.ContactEditScreen
 import com.rr.numio.phone.data.PhoneData
 import com.rr.numio.phone.data.PhoneNumbers
 import androidx.compose.runtime.collectAsState
@@ -82,12 +84,16 @@ fun PhoneApp(
     onAllowContacts: () -> Unit,
     onMessage: (String) -> Unit,
     onOpenContact: (Contact) -> Unit,
-    onAddContact: (String) -> Unit,
+    onSaveContact: (ContactDraft, (Boolean) -> Unit) -> Unit,
+    onDeleteContact: (Long, (Boolean) -> Unit) -> Unit,
 ) {
     var tab by rememberSaveable { mutableStateOf(Tab.KEYPAD) }
     var showSettings by rememberSaveable { mutableStateOf(false) }
     // Details page on top of the tabs: "n:<number>" for a number, "c:<id>" for a contact
     var detail by rememberSaveable { mutableStateOf<String?>(null) }
+    // Contact editor on top of everything: "new", "new:<number>" or "edit:<id>"
+    var editor by rememberSaveable { mutableStateOf<String?>(null) }
+    var saving by remember { mutableStateOf(false) }
 
     // Read straight from Android's call log and contacts; re-read when access changes
     val hasLog = remember(permissionTick) { phone.hasCallLog() }
@@ -101,6 +107,7 @@ fun PhoneApp(
             tab = Tab.KEYPAD
             showSettings = false
             detail = null
+            editor = null
         }
     }
 
@@ -109,8 +116,48 @@ fun PhoneApp(
             .fillMaxSize()
             .background(Numio.colors.background),
     ) {
+        val editing = editor
         val current = detail
-        if (current != null && !showSettings) {
+        if (editing != null) {
+            BackHandler { editor = null }
+            val existing = if (editing.startsWith("edit:")) {
+                contacts.firstOrNull { it.id.toString() == editing.removePrefix("edit:") }
+            } else {
+                null
+            }
+            if (editing.startsWith("edit:") && existing == null) {
+                // The contact was deleted elsewhere
+                LaunchedEffect(editing) { editor = null }
+                return@Box
+            }
+            val prefill = if (editing.startsWith("new:")) editing.removePrefix("new:") else null
+            val initial = existing?.let { ContactDraft.from(it) } ?: ContactDraft.new(prefill)
+            ContactEditScreen(
+                initial = initial,
+                photoUri = existing?.photoUri,
+                saving = saving,
+                onCancel = { editor = null },
+                onSave = { draft ->
+                    saving = true
+                    onSaveContact(draft) { ok ->
+                        saving = false
+                        if (ok) editor = null
+                    }
+                },
+                onDelete = existing?.let { c ->
+                    {
+                        saving = true
+                        onDeleteContact(c.id) { ok ->
+                            saving = false
+                            if (ok) {
+                                editor = null
+                                detail = null
+                            }
+                        }
+                    }
+                },
+            )
+        } else if (current != null && !showSettings) {
             BackHandler { detail = null }
             if (current.startsWith("n:")) {
                 val number = current.removePrefix("n:")
@@ -125,7 +172,7 @@ fun PhoneApp(
                     onOpenContact = {
                         contacts.firstOrNull { c -> c.numbers.any { PhoneNumbers.same(it.number, number) } }?.let(onOpenContact)
                     },
-                    onAddContact = { onAddContact(number) },
+                    onAddContact = { editor = "new:$number" },
                 )
             } else {
                 val contact = contacts.firstOrNull { it.id.toString() == current.removePrefix("c:") }
@@ -139,6 +186,7 @@ fun PhoneApp(
                         onCall = onCall,
                         onMessage = onMessage,
                         onOpenInContacts = { onOpenContact(contact) },
+                        onEdit = { editor = "edit:${contact.id}" },
                     )
                 }
             }
@@ -179,6 +227,7 @@ fun PhoneApp(
                             onAllow = onAllowContacts,
                             onOpen = { detail = "c:${it.id}" },
                             onCall = onCall,
+                            onAdd = { editor = "new" },
                         )
                         Tab.KEYPAD -> KeypadScreen(
                             dialRequest = dialRequest,

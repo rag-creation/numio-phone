@@ -25,6 +25,7 @@ import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import com.rr.numio.phone.data.AppSettings
+import com.rr.numio.phone.data.ContactWriter
 import com.rr.numio.phone.data.PhoneData
 import com.rr.numio.phone.dialpad.DialPad
 import com.rr.numio.phone.telecom.CallNotifications
@@ -32,7 +33,11 @@ import com.rr.numio.phone.telecom.DialerRole
 import com.rr.numio.phone.ui.PhoneApp
 import com.rr.numio.phone.ui.theme.PhonebyNumioTheme
 import com.rr.numio.phone.ui.theme.ThemeMode
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import androidx.lifecycle.lifecycleScope
+import android.widget.Toast
 
 class MainActivity : ComponentActivity() {
 
@@ -63,6 +68,41 @@ class MainActivity : ComponentActivity() {
         }
         prefs.edit().putBoolean(permission, true).apply()
         accessRequest.launch(permission)
+    }
+
+    // Saving contacts needs write access, asked the first time you press Save
+    private var pendingWrite: (() -> Unit)? = null
+    private var pendingWriteFailed: (() -> Unit)? = null
+    private val writeRequest = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+        lastAccess = phone.hasCallLog() to phone.hasContacts()
+        permissionTick++
+        val go = pendingWrite
+        val fail = pendingWriteFailed
+        pendingWrite = null
+        pendingWriteFailed = null
+        if (has(Manifest.permission.WRITE_CONTACTS)) go?.invoke() else fail?.invoke()
+    }
+
+    /** Runs [write] off the main thread once write access is there; [done] gets the result. */
+    private fun withContactsWrite(done: (Boolean) -> Unit, write: () -> Boolean) {
+        val run = {
+            lifecycleScope.launch {
+                val ok = withContext(Dispatchers.IO) { write() }
+                if (!ok) Toast.makeText(this@MainActivity, R.string.save_failed, Toast.LENGTH_LONG).show()
+                done(ok)
+            }
+            Unit
+        }
+        if (has(Manifest.permission.WRITE_CONTACTS)) {
+            run()
+        } else {
+            pendingWrite = run
+            pendingWriteFailed = {
+                Toast.makeText(this, R.string.need_write_contacts, Toast.LENGTH_LONG).show()
+                done(false)
+            }
+            writeRequest.launch(arrayOf(Manifest.permission.READ_CONTACTS, Manifest.permission.WRITE_CONTACTS))
+        }
     }
 
     private fun startSafely(intent: Intent) {
@@ -149,12 +189,11 @@ class MainActivity : ComponentActivity() {
                     onOpenContact = { contact ->
                         startSafely(Intent(Intent.ACTION_VIEW, phone.contactUri(contact)))
                     },
-                    onAddContact = { number ->
-                        startSafely(
-                            Intent(Intent.ACTION_INSERT_OR_EDIT)
-                                .setType(ContactsContract.Contacts.CONTENT_ITEM_TYPE)
-                                .putExtra(ContactsContract.Intents.Insert.PHONE, number),
-                        )
+                    onSaveContact = { draft, done ->
+                        withContactsWrite(done) { ContactWriter(this).save(draft) }
+                    },
+                    onDeleteContact = { id, done ->
+                        withContactsWrite(done) { ContactWriter(this).delete(id) }
                     },
                 )
             }

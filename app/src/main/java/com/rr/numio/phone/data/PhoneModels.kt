@@ -38,7 +38,60 @@ data class Contact(
     val photoUri: String?,
 )
 
-data class ContactNumber(val number: String, val label: String?)
+/**
+ * One saved number. [type] uses Android's phone types (2 = mobile, 1 = home, 3 = work,
+ * 7 = other); [label] is the text shown for it.
+ */
+data class ContactNumber(val number: String, val label: String?, val type: Int = PhoneType.MOBILE)
+
+object PhoneType {
+    const val HOME = 1
+    const val MOBILE = 2
+    const val WORK = 3
+    const val OTHER = 7
+
+    /** The four choices the editor cycles through. */
+    val choices = listOf(MOBILE, HOME, WORK, OTHER)
+
+    fun next(type: Int): Int = choices[(choices.indexOf(type).coerceAtLeast(0) + 1) % choices.size]
+}
+
+/** What the contact editor saves. [id] is null for a new contact. */
+data class ContactDraft(
+    val id: Long?,
+    val name: String,
+    val numbers: List<ContactNumber>,
+    val starred: Boolean,
+) {
+    /** Numbers worth saving: dialable characters only, empty rows dropped, no duplicates. */
+    val cleanNumbers: List<ContactNumber>
+        get() {
+            val out = mutableListOf<ContactNumber>()
+            for (n in numbers) {
+                val cleaned = n.number.trim()
+                if (cleaned.none { it.isDigit() }) continue
+                if (out.any { PhoneNumbers.same(it.number, cleaned) }) continue
+                out += n.copy(number = cleaned)
+            }
+            return out
+        }
+
+    /** A contact needs a name or at least one number. */
+    val canSave: Boolean get() = name.isNotBlank() || cleanNumbers.isNotEmpty()
+
+    /** Name to save: the typed name, else the first number. */
+    val savedName: String get() = name.trim().ifBlank { cleanNumbers.firstOrNull()?.number.orEmpty() }
+
+    companion object {
+        fun from(contact: Contact) = ContactDraft(contact.id, contact.name, contact.numbers, contact.starred)
+        fun new(number: String? = null) = ContactDraft(
+            id = null,
+            name = "",
+            numbers = listOf(ContactNumber(number.orEmpty(), null, PhoneType.MOBILE)),
+            starred = false,
+        )
+    }
+}
 
 object PhoneNumbers {
     /** Digits only, keeping a leading "+". */

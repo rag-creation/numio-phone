@@ -159,7 +159,7 @@ class PhoneData(context: Context) {
                     rows.getOrPut(id) { Row(name, c.getInt(5) == 1, c.getString(6).orEmpty(), c.getString(7)) }
                     val list = numbers.getOrPut(id) { mutableListOf() }
                     // Same number saved twice (e.g. with and without +971): keep one
-                    if (list.none { PhoneNumbers.same(it.number, number) }) list += ContactNumber(number, label)
+                    if (list.none { PhoneNumbers.same(it.number, number) }) list += ContactNumber(number, label, c.getInt(3))
                 }
             }
         } catch (e: SecurityException) {

@@ -83,3 +83,34 @@ class PhoneModelsTest {
         assertEquals(listOf("achan", "Anu", "bala"), sorted.map { it.name })
     }
 }
+
+class ContactDraftTest {
+    private fun n(number: String) = com.rr.numio.phone.data.ContactNumber(number, null)
+
+    @Test
+    fun dropsEmptyAndDuplicateNumbers() {
+        val d = com.rr.numio.phone.data.ContactDraft(null, "Amma", listOf(n(" "), n("+971 50 123 4567"), n("0501234567"), n("04 555 1234")), false)
+        assertEquals(listOf("+971 50 123 4567", "04 555 1234"), d.cleanNumbers.map { it.number })
+    }
+
+    @Test
+    fun needsNameOrNumber() {
+        assertFalse(com.rr.numio.phone.data.ContactDraft(null, "  ", listOf(n("")), false).canSave)
+        assertTrue(com.rr.numio.phone.data.ContactDraft(null, "Amma", emptyList(), false).canSave)
+        assertTrue(com.rr.numio.phone.data.ContactDraft(null, "", listOf(n("0501234567")), false).canSave)
+    }
+
+    @Test
+    fun nameFallsBackToNumber() {
+        assertEquals("0501234567", com.rr.numio.phone.data.ContactDraft(null, "", listOf(n("0501234567")), false).savedName)
+        assertEquals("Amma", com.rr.numio.phone.data.ContactDraft(null, " Amma ", emptyList(), false).savedName)
+    }
+
+    @Test
+    fun labelCycleWraps() {
+        val t = com.rr.numio.phone.data.PhoneType
+        assertEquals(t.HOME, t.next(t.MOBILE))
+        assertEquals(t.MOBILE, t.next(t.OTHER))
+        assertEquals(t.HOME, t.next(99))
+    }
+}

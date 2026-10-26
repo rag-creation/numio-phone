@@ -54,7 +54,8 @@ Nothing is asked for on first launch. Each permission is asked for only when you
 | `POST_NOTIFICATIONS`, `USE_FULL_SCREEN_INTENT` | 1 | Show an incoming call, including on the lock screen |
 | `WAKE_LOCK` | 1 | Turn the screen off when the phone is at your ear |
 | `READ_CALL_LOG` | 2 | Show call history (read only; nothing is copied) |
-| `READ_CONTACTS` | 3 | Show names and the contact list (read only; contacts are never changed) |
+| `READ_CONTACTS` | 3 | Show names and the contact list |
+| `WRITE_CONTACTS` | 3 | Add, edit and delete contacts, asked the first time you press Save. Saved to the phone's own storage, never online |
 | `READ_PHONE_STATE` | 4 | List SIMs so you can choose one |
 | Call screening role | 5 | Block numbers before they ring |
 

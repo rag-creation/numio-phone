@@ -9,6 +9,8 @@
     <!-- Recents and Contacts tabs: asked for only when you tap Allow there -->
     <uses-permission android:name="android.permission.READ_CALL_LOG" />
     <uses-permission android:name="android.permission.READ_CONTACTS" />
+    <!-- Add, edit and delete contacts: asked the first time you press Save -->
+    <uses-permission android:name="android.permission.WRITE_CONTACTS" />
     <!-- Turns the screen off when the phone is at your ear during a call -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 

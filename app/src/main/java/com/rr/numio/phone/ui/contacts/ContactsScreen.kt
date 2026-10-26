@@ -61,6 +61,7 @@ fun ContactsScreen(
     onAllow: () -> Unit,
     onOpen: (Contact) -> Unit,
     onCall: (String) -> Unit,
+    onAdd: () -> Unit,
 ) {
     if (!hasPermission) {
         PermissionPrompt(
@@ -78,7 +79,10 @@ fun ContactsScreen(
     val shown = remember(contacts, query) { contacts.filter { ContactSearch.matches(it, query) } }
 
     Column(Modifier.fillMaxSize()) {
-        SearchField(query, onChange = { query = it })
+        Row(Modifier.fillMaxWidth().padding(end = 20.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.weight(1f)) { SearchField(query, onChange = { query = it }) }
+            RingIconButton(R.drawable.ic_plus, stringResource(R.string.new_contact), size = 48.dp, tint = Numio.colors.accentInk, onClick = onAdd)
+        }
         if (contacts.isEmpty()) {
             EmptyState(
                 icon = R.drawable.ic_contacts,
