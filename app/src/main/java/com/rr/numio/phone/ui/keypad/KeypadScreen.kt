@@ -3,6 +3,7 @@ package com.rr.numio.phone.ui.keypad
 import android.view.HapticFeedbackConstants
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -33,6 +34,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -51,8 +54,9 @@ import com.rr.numio.phone.ui.theme.Numio
 import com.rr.numio.phone.ui.theme.NumberDisplay
 
 /**
- * Dial pad. In this first version it only types the number: placing calls
- * comes with the Telecom milestone, so the call button explains that instead.
+ * "Halo" dial pad: thin ring keys, light digits, amber letters, and an amber
+ * call button with a soft ring around it. In this version it only types the
+ * number: placing calls comes with the Telecom milestone.
  */
 @Composable
 fun KeypadScreen() {
@@ -62,12 +66,11 @@ fun KeypadScreen() {
     fun tap() = view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
 
     Column(
-        Modifier.fillMaxSize().padding(horizontal = 32.dp),
+        Modifier.fillMaxSize().padding(horizontal = 28.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Spacer(Modifier.weight(1f))
 
-        // Number + thin amber line under it
         Text(
             text = number,
             style = NumberDisplay,
@@ -77,18 +80,12 @@ fun KeypadScreen() {
             textAlign = TextAlign.Center,
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 48.dp)
+                .heightIn(min = 50.dp)
                 .semantics { contentDescription = number },
         )
         Spacer(Modifier.height(8.dp))
-        Box(
-            Modifier
-                .width(if (number.isEmpty()) 24.dp else 56.dp)
-                .height(2.dp)
-                .clip(RoundedCornerShape(1.dp))
-                .background(Numio.colors.accent),
-        )
-        Spacer(Modifier.height(12.dp))
+        GlowLine(wide = number.isNotEmpty())
+        Spacer(Modifier.height(10.dp))
         Text(
             text = if (showNotice) stringResource(R.string.calling_not_yet) else "",
             style = MaterialTheme.typography.bodySmall,
@@ -97,16 +94,15 @@ fun KeypadScreen() {
             minLines = 2,
             modifier = Modifier.fillMaxWidth(),
         )
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(10.dp))
 
-        // 4 × 3 keys
         DialPad.keys.chunked(3).forEach { row ->
             Row(
-                Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                Modifier.fillMaxWidth().padding(vertical = 7.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly,
             ) {
                 row.forEach { key ->
-                    DialKeyButton(
+                    HaloKey(
                         key = key,
                         onClick = {
                             tap()
@@ -126,17 +122,16 @@ fun KeypadScreen() {
             }
         }
 
-        Spacer(Modifier.height(14.dp))
+        Spacer(Modifier.height(12.dp))
 
-        // Call button in the middle, backspace on the right
         Row(
-            Modifier.fillMaxWidth().padding(bottom = 20.dp),
+            Modifier.fillMaxWidth().padding(bottom = 18.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Spacer(Modifier.size(72.dp))
+            Spacer(Modifier.size(76.dp))
             CallButton(onClick = { tap(); showNotice = true })
-            Box(Modifier.size(72.dp), contentAlignment = Alignment.Center) {
+            Box(Modifier.size(76.dp), contentAlignment = Alignment.Center) {
                 if (number.isNotEmpty()) {
                     BackspaceButton(
                         onClick = { tap(); number = DialPad.backspace(number) },
@@ -148,16 +143,47 @@ fun KeypadScreen() {
     }
 }
 
+// Thin amber line under the number; in dark mode it has a soft glow
+@Composable
+private fun GlowLine(wide: Boolean) {
+    val width = if (wide) 56.dp else 24.dp
+    val accent = Numio.colors.accent
+    Box(Modifier.width(width + 16.dp).height(10.dp), contentAlignment = Alignment.Center) {
+        if (!Numio.colors.isLight) {
+            Box(
+                Modifier
+                    .width(width + 12.dp)
+                    .height(10.dp)
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(Color.Transparent, accent.copy(alpha = 0.28f), Color.Transparent),
+                        ),
+                        RoundedCornerShape(5.dp),
+                    ),
+            )
+        }
+        Box(
+            Modifier
+                .width(width)
+                .height(2.dp)
+                .clip(RoundedCornerShape(1.dp))
+                .background(accent),
+        )
+    }
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun DialKeyButton(key: DialKey, onClick: () -> Unit, onLongClick: (() -> Unit)?) {
+private fun HaloKey(key: DialKey, onClick: () -> Unit, onLongClick: (() -> Unit)?) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
+    val colors = Numio.colors
     Column(
         Modifier
-            .size(72.dp)
+            .size(76.dp)
             .clip(CircleShape)
-            .background(if (pressed) Numio.colors.surfacePressed else Numio.colors.surface)
+            .background(if (pressed) colors.keyPressed else Color.Transparent)
+            .border(1.dp, if (pressed) colors.accent else colors.ring, CircleShape)
             .combinedClickable(
                 interactionSource = interaction,
                 indication = null,
@@ -168,9 +194,10 @@ private fun DialKeyButton(key: DialKey, onClick: () -> Unit, onLongClick: (() ->
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Text(key.char.toString(), style = KeyDigit, color = Numio.colors.text)
+        Text(key.char.toString(), style = KeyDigit, color = colors.text)
+        Spacer(Modifier.height(2.dp))
         // Every key keeps the same height, with or without letters
-        Text(key.letters.ifEmpty { " " }, style = KeyLetters, color = Numio.colors.textSoft)
+        Text(key.letters.ifEmpty { " " }, style = KeyLetters, color = colors.accentInk)
     }
 }
 
@@ -179,19 +206,26 @@ private fun CallButton(onClick: () -> Unit) {
     val description = stringResource(R.string.call)
     Box(
         Modifier
-            .size(72.dp)
-            .clip(CircleShape)
-            .background(Numio.colors.accent)
-            .clickable(role = Role.Button, onClick = onClick)
-            .semantics { contentDescription = description },
+            .size(92.dp)
+            .border(1.dp, Numio.colors.callRing, CircleShape),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(
-            painterResource(R.drawable.ic_call),
-            contentDescription = null,
-            tint = Numio.colors.onAccent,
-            modifier = Modifier.size(30.dp),
-        )
+        Box(
+            Modifier
+                .size(76.dp)
+                .clip(CircleShape)
+                .background(Numio.colors.accent)
+                .clickable(role = Role.Button, onClick = onClick)
+                .semantics { contentDescription = description },
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                painterResource(R.drawable.ic_call),
+                contentDescription = null,
+                tint = Numio.colors.onAccent,
+                modifier = Modifier.size(30.dp),
+            )
+        }
     }
 }
 
