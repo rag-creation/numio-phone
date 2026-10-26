@@ -8,6 +8,7 @@ import android.telecom.Call
 import android.telecom.CallAudioState
 import android.telecom.PhoneAccountHandle
 import android.telecom.TelecomManager
+import com.rr.numio.phone.data.PhoneData
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -108,6 +109,7 @@ object CallManager {
     }
 
     internal fun clear() {
+        names.clear()
         calls.forEach { it.unregisterCallback(callback) }
         calls.clear()
         _state.value = CallSnapshot()
@@ -133,11 +135,13 @@ object CallManager {
     private fun toInfo(call: Call): CallInfo {
         val d = call.details
         val number = d.handle?.schemeSpecificPart.orEmpty()
-        val name = if (Build.VERSION.SDK_INT >= 30) {
+        val fromAndroid = if (Build.VERSION.SDK_INT >= 30) {
             d.contactDisplayName ?: d.callerDisplayName
         } else {
             d.callerDisplayName
         }
+        // Android often leaves the name empty; look it up in contacts when we're allowed to
+        val name = fromAndroid?.takeIf { it.isNotBlank() } ?: lookUpName(number)
         return CallInfo(
             id = idOf(call),
             state = stateOf(call),
@@ -149,6 +153,13 @@ object CallManager {
             isConference = d.hasProperty(Call.Details.PROPERTY_CONFERENCE),
             simChoices = if (stateOf(call) == Call.STATE_SELECT_PHONE_ACCOUNT) simChoices(call) else emptyList(),
         )
+    }
+
+    private val names = HashMap<String, String?>()
+
+    private fun lookUpName(number: String): String? {
+        if (number.isBlank()) return null
+        return names.getOrPut(number) { appContext?.let { PhoneData(it).nameFor(number) } }
     }
 
     private fun simChoices(call: Call): List<SimChoice> {

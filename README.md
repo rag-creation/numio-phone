@@ -9,16 +9,16 @@ A private, offline phone app for Android. Part of the Numio family, alongside Nu
 
 Calls themselves still go through Android and your carrier, as with any phone app. "Offline" means the app itself never connects to the internet.
 
-> **Status: milestone 1 (in testing).** Phone by Numio can be your default phone app: it places calls and shows its own ringing and on-a-call screens, including over the lock screen. Call history and contacts come next.
+> **Status: milestones 1–3 (in testing).** Phone by Numio can be your default phone app: it places calls, shows its own ringing and on-a-call screens (including over the lock screen), and has call history and contacts. Dual-SIM polish and blocking come next.
 
 ## Milestones
 
 | # | Milestone | What it adds |
 |---|-----------|--------------|
 | 0 | Foundation ✓ | Project, Numio theme (dark / light / system), dial pad, tabs, settings, tests, CI |
-| 1 | **Default phone app** (this) | Ask for the default phone app role, dial intents, outgoing calls, `InCallService` with real incoming and ongoing call screens (answer, decline, mute, speaker, keypad, hold, end), call notification on the lock screen |
-| 2 | Call history | Recents (incoming, outgoing, missed), call details, redial |
-| 3 | Contacts | Contact list, search, favourites, contact details |
+| 1 | Default phone app ✓ | Ask for the default phone app role, dial intents, outgoing calls, `InCallService` with real incoming and ongoing call screens (answer, decline, mute, speaker, keypad, hold, end), call notification on the lock screen |
+| 2 | **Call history** (this) | Recents (incoming, outgoing, missed), call details, redial |
+| 3 | **Contacts** (this) | Contact list, search, favourites, contact details |
 | 4 | Dual SIM | Choose the SIM per call, SIM labels in history |
 | 5 | Blocking | Blocked numbers through Android's system block list and `CallScreeningService` |
 | 6 | Polish | Accent colour picker, About page and Numio easter egg, accessibility pass, app icon, F-Droid listing |
@@ -53,8 +53,8 @@ Nothing is asked for on first launch. Each permission is asked for only when you
 | `CALL_PHONE` | 1 | Place a call |
 | `POST_NOTIFICATIONS`, `USE_FULL_SCREEN_INTENT` | 1 | Show an incoming call, including on the lock screen |
 | `WAKE_LOCK` | 1 | Turn the screen off when the phone is at your ear |
-| `READ_CALL_LOG`, `WRITE_CALL_LOG` | 2 | Show and clear call history |
-| `READ_CONTACTS` | 3 | Show names and the contact list |
+| `READ_CALL_LOG` | 2 | Show call history (read only; nothing is copied) |
+| `READ_CONTACTS` | 3 | Show names and the contact list (read only; contacts are never changed) |
 | `READ_PHONE_STATE` | 4 | List SIMs so you can choose one |
 | Call screening role | 5 | Block numbers before they ring |
 
