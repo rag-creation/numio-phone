@@ -28,19 +28,20 @@ val PhoneTypography = Typography(
     labelSmall = base.labelSmall.copy(fontFamily = Inter, letterSpacing = 1.2.sp),
 )
 
-// Numbers: tabular figures so digits don't jump around while typing
+// Numbers use the phone's own light sans-serif (Halo keypad): thin digits read
+// calmer than Inter Regular. Tabular figures so digits don't jump while typing.
 val NumberDisplay = TextStyle(
-    fontFamily = Inter,
-    fontWeight = FontWeight.Normal,
-    fontSize = 36.sp,
-    letterSpacing = 1.sp,
+    fontFamily = FontFamily.SansSerif,
+    fontWeight = FontWeight.Light,
+    fontSize = 38.sp,
+    letterSpacing = 1.5.sp,
     fontFeatureSettings = "tnum",
 )
 
 val KeyDigit = TextStyle(
-    fontFamily = Inter,
-    fontWeight = FontWeight.Normal,
-    fontSize = 30.sp,
+    fontFamily = FontFamily.SansSerif,
+    fontWeight = FontWeight.Light,
+    fontSize = 32.sp,
     fontFeatureSettings = "tnum",
 )
 
@@ -48,5 +49,5 @@ val KeyLetters = TextStyle(
     fontFamily = Inter,
     fontWeight = FontWeight.Bold,
     fontSize = 10.sp,
-    letterSpacing = 1.5.sp,
+    letterSpacing = 1.8.sp,
 )

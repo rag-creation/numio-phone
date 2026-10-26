@@ -8,8 +8,10 @@ import androidx.compose.ui.graphics.Color
 // greys are tints of them for surfaces, lines and secondary text.
 data class PhonePalette(
     val background: Color,
-    val surface: Color,      // dial keys, setting rows
-    val surfacePressed: Color,
+    val surface: Color,      // setting rows
+    val ring: Color,         // thin outline of a dial key
+    val keyPressed: Color,   // amber wash inside a pressed key
+    val callRing: Color,     // soft halo around the call button
     val divider: Color,
     val text: Color,
     val textSoft: Color,     // secondary text, letters under digits
@@ -24,7 +26,9 @@ object Palettes {
     val Dark = PhonePalette(
         background = Color(0xFF0F0F0E),
         surface = Color(0xFF1A1A18),
-        surfacePressed = Color(0xFF2A2925),
+        ring = Color(0xFF2E2D29),
+        keyPressed = Color(0x1AFFC21A),
+        callRing = Color(0x59FFC21A),
         divider = Color(0xFF262622),
         text = Color(0xFFF1EEE6),
         textSoft = Color(0xFFA9A59B),
@@ -38,7 +42,9 @@ object Palettes {
     val Light = PhonePalette(
         background = Color(0xFFF6F4EE),
         surface = Color(0xFFECE9E0),
-        surfacePressed = Color(0xFFDFDBD0),
+        ring = Color(0xFFD3CEC1),
+        keyPressed = Color(0x24E9A800),
+        callRing = Color(0x73E9A800),
         divider = Color(0xFFDEDAD0),
         text = Color(0xFF191815),
         textSoft = Color(0xFF5F5B52),
