@@ -22,6 +22,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import com.rr.numio.phone.MainActivity
 import com.rr.numio.phone.data.AppSettings
 import com.rr.numio.phone.telecom.CallManager
+import com.rr.numio.phone.telecom.CallNotifications
 import com.rr.numio.phone.telecom.CallSnapshot
 import com.rr.numio.phone.telecom.SimChoice
 import com.rr.numio.phone.ui.call.CallActions
@@ -124,6 +125,18 @@ class CallActivity : ComponentActivity() {
                 CallManager.state.collect { updateProximity(it) }
             }
         }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        CallNotifications.screenVisible = true
+        CallManager.refreshNotification()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        CallNotifications.screenVisible = false
+        CallManager.refreshNotification()
     }
 
     override fun onResume() {

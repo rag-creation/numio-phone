@@ -98,6 +98,11 @@ object CallManager {
         main.postDelayed({ if (_state.value.ended?.id == info.id) publish(ended = null) }, 1500)
     }
 
+    /** Re-post the notification, e.g. when the call screen opens or closes. */
+    fun refreshNotification() {
+        appContext?.let { CallNotifications.update(it, _state.value) }
+    }
+
     internal fun onAudioChanged(audio: CallAudioState?) {
         _state.value = _state.value.copy(audio = audio)
     }
