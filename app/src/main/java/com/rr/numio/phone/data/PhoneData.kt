@@ -19,9 +19,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.conflate
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.merge
 import java.util.Locale
 
 /**
@@ -55,7 +58,12 @@ class PhoneData(context: Context) {
 
     fun callLog(): Flow<List<CallEntry>> =
         if (!hasCallLog()) flowOf(emptyList())
-        else changes(CallLog.Calls.CONTENT_URI).map { readCallLog() }.flowOn(Dispatchers.IO)
+        // Also re-read when contacts change, so a number saved as a contact (even from
+        // WhatsApp) gets its name in Recents straight away, not only after the next call
+        else merge(
+            changes(CallLog.Calls.CONTENT_URI),
+            if (hasContacts()) changes(ContactsContract.Contacts.CONTENT_URI) else emptyFlow(),
+        ).conflate().map { readCallLog() }.flowOn(Dispatchers.IO)
 
     fun contacts(): Flow<List<Contact>> =
         if (!hasContacts()) flowOf(emptyList())
