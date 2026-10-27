@@ -233,6 +233,7 @@ fun PhoneApp(
                             dialRequest = dialRequest,
                             onDialRequestUsed = onDialRequestUsed,
                             notice = notice,
+                            contacts = contacts,
                             onCall = onCall,
                         )
                     }
