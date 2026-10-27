@@ -35,8 +35,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -47,6 +49,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.rr.numio.phone.R
+import com.rr.numio.phone.data.Contact
+import com.rr.numio.phone.data.PhoneData
+import com.rr.numio.phone.dialpad.SmartDial
+import com.rr.numio.phone.dialpad.SmartDialMatch
+import com.rr.numio.phone.ui.common.PersonAvatar
 import com.rr.numio.phone.dialpad.DialKey
 import com.rr.numio.phone.dialpad.DialPad
 import com.rr.numio.phone.ui.theme.KeyDigit
@@ -63,9 +70,12 @@ fun KeypadScreen(
     dialRequest: String?,
     onDialRequestUsed: () -> Unit,
     notice: String?,
+    contacts: List<Contact>,
     onCall: (String) -> Unit,
 ) {
     var number by rememberSaveable { mutableStateOf("") }
+    // Smart dial: contacts whose name (by the letters on the keys) or number matches
+    val matches = remember(number, contacts) { SmartDial.search(contacts, number) }
     val view = LocalView.current
     // A number handed over by another app (a tel: link) fills the keypad
     LaunchedEffect(dialRequest) {
@@ -80,7 +90,16 @@ fun KeypadScreen(
         Modifier.fillMaxSize().padding(horizontal = 28.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Spacer(Modifier.weight(1f))
+        Column(
+            // Rows that don't fit on a small screen are cut off at the top, never over the keys
+            Modifier.weight(1f).fillMaxWidth().clipToBounds(),
+            verticalArrangement = Arrangement.Bottom,
+        ) {
+            matches.forEach { match ->
+                SmartDialRow(match, onClick = { tap(); onCall(match.number.number) })
+            }
+            if (matches.isNotEmpty()) Spacer(Modifier.height(8.dp))
+        }
 
         Text(
             text = number,
@@ -254,6 +273,49 @@ private fun BackspaceButton(onClick: () -> Unit, onLongClick: () -> Unit) {
             contentDescription = stringResource(R.string.backspace),
             tint = Numio.colors.textSoft,
             modifier = Modifier.size(26.dp),
+        )
+    }
+}
+
+/** A contact found by smart dial: tap to call. */
+@Composable
+private fun SmartDialRow(match: SmartDialMatch, onClick: () -> Unit) {
+    val context = LocalContext.current
+    val shown = PhoneData.format(context, match.number.number)
+    val description = stringResource(R.string.call) + " " + match.contact.name
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = 56.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .clickable(role = Role.Button, onClick = onClick)
+            .semantics { contentDescription = description }
+            .padding(horizontal = 8.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        PersonAvatar(match.contact.name, match.contact.photoUri, size = 40.dp)
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                match.contact.name,
+                style = MaterialTheme.typography.bodyLarge,
+                color = Numio.colors.text,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                listOfNotNull(match.number.label, shown).joinToString(" · "),
+                style = MaterialTheme.typography.bodySmall,
+                color = if (match.byName) Numio.colors.textSoft else Numio.colors.accentInk,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Icon(
+            painterResource(R.drawable.ic_call),
+            contentDescription = null,
+            tint = Numio.colors.accent,
+            modifier = Modifier.size(20.dp),
         )
     }
 }
