@@ -98,5 +98,6 @@ Phone by Numio is free software under the [GNU GPL v3.0 only](LICENSE).
 - [Inter](https://github.com/rsms/inter) font, SIL Open Font License 1.1 ([licence](licenses/Inter-OFL.txt))
 - The "Numio." wordmark uses letter shapes from [Chakra Petch](https://github.com/m4rc1e/Chakra-Petch), SIL Open Font License 1.1 ([licence](licenses/ChakraPetch-OFL.txt))
 - Icons from [Material Symbols](https://github.com/google/material-design-icons), Apache License 2.0
+- The Bluetooth icon and the lock shackle are from [Lucide](https://github.com/lucide-icons/lucide), ISC licence ([licence](licenses/Lucide-ISC.txt))
 
 Built by RR with help from Claude.
