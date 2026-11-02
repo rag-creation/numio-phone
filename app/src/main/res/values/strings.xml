@@ -122,4 +122,17 @@
 
     <string name="channel_incoming">Incoming calls</string>
     <string name="channel_ongoing">Ongoing calls</string>
+
+    <!-- Long-press actions -->
+    <string name="phone_number">Phone number</string>
+    <string name="copy_number">Copy number</string>
+    <string name="copy_this_number">Copy %1$s</string>
+    <string name="number_copied">Number copied</string>
+    <string name="paste">Paste</string>
+    <string name="send_message">Send message</string>
+    <string name="save_to_contacts">Save to contacts</string>
+    <string name="create_new_contact">Create new contact</string>
+    <string name="add_to_existing">Add to existing contact</string>
+    <string name="add_to_existing_title">Add to which contact?</string>
+    <string name="view_contact">View contact</string>
 </resources>

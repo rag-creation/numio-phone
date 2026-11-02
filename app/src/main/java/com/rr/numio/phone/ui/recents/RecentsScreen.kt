@@ -1,7 +1,9 @@
 package com.rr.numio.phone.ui.recents
 
 import android.text.format.DateFormat
-import androidx.compose.foundation.clickable
+import android.view.HapticFeedbackConstants
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -22,6 +24,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -53,6 +56,7 @@ fun RecentsScreen(
     onAllow: () -> Unit,
     onOpen: (String) -> Unit,
     onCall: (String) -> Unit,
+    onLongPress: (String) -> Unit,
 ) {
     if (!hasPermission) {
         PermissionPrompt(
@@ -90,7 +94,13 @@ fun RecentsScreen(
             Column {
                 if (showDay) SectionLabel(dayLabel(day, today))
                 val photo = contacts.firstOrNull { c -> c.numbers.any { PhoneNumbers.same(it.number, group.number) } }?.photoUri
-                RecentRow(group, photo, onOpen = { onOpen(group.number) }, onCall = { onCall(group.number) })
+                RecentRow(
+                    group,
+                    photo,
+                    onOpen = { onOpen(group.number) },
+                    onCall = { onCall(group.number) },
+                    onLongPress = { onLongPress(group.number) },
+                )
             }
         }
     }
@@ -133,15 +143,29 @@ fun kindLabel(kind: CallKind): String = stringResource(
 fun kindColor(kind: CallKind): Color =
     if (kind == CallKind.MISSED) Numio.colors.danger else Numio.colors.textSoft
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun RecentRow(group: CallGroup, photoUri: String?, onOpen: () -> Unit, onCall: () -> Unit) {
+private fun RecentRow(group: CallGroup, photoUri: String?, onOpen: () -> Unit, onCall: () -> Unit, onLongPress: () -> Unit) {
     val context = LocalContext.current
+    val view = LocalView.current
     val latest = group.latest
     val missed = latest.kind == CallKind.MISSED
     Row(
         Modifier
             .fillMaxWidth()
-            .clickable(role = Role.Button, onClick = onOpen)
+            .combinedClickable(
+                role = Role.Button,
+                onClick = onOpen,
+                // Hidden numbers can't be copied or saved
+                onLongClick = if (group.number.isNotBlank()) {
+                    {
+                        view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                        onLongPress()
+                    }
+                } else {
+                    null
+                },
+            )
             .padding(horizontal = 24.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

@@ -22,6 +22,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -38,6 +41,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
@@ -49,6 +53,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.rr.numio.phone.R
+import com.rr.numio.phone.data.Clip
 import com.rr.numio.phone.data.Contact
 import com.rr.numio.phone.data.PhoneData
 import com.rr.numio.phone.dialpad.SmartDial
@@ -72,8 +77,11 @@ fun KeypadScreen(
     notice: String?,
     contacts: List<Contact>,
     onCall: (String) -> Unit,
+    onSaveNumber: (String) -> Unit,
 ) {
     var number by rememberSaveable { mutableStateOf("") }
+    var numberMenu by remember { mutableStateOf(false) }
+    val context = LocalContext.current
     // Smart dial: contacts whose name (by the letters on the keys) or number matches
     val matches = remember(number, contacts) { SmartDial.search(contacts, number) }
     val view = LocalView.current
@@ -101,18 +109,56 @@ fun KeypadScreen(
             if (matches.isNotEmpty()) Spacer(Modifier.height(8.dp))
         }
 
-        Text(
-            text = number,
-            style = NumberDisplay,
-            color = Numio.colors.text,
-            maxLines = 1,
-            overflow = TextOverflow.StartEllipsis,
-            textAlign = TextAlign.Center,
-            modifier = Modifier
+        // Long press the number: copy, paste or save it
+        Box(
+            Modifier
                 .fillMaxWidth()
-                .heightIn(min = 50.dp)
-                .semantics { contentDescription = number },
-        )
+                .pointerInput(Unit) {
+                    detectTapGestures(onLongPress = {
+                        view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                        numberMenu = true
+                    })
+                },
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = number,
+                style = NumberDisplay,
+                color = Numio.colors.text,
+                maxLines = 1,
+                overflow = TextOverflow.StartEllipsis,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 50.dp)
+                    .semantics { contentDescription = number },
+            )
+            DropdownMenu(
+                expanded = numberMenu,
+                onDismissRequest = { numberMenu = false },
+                containerColor = Numio.colors.background,
+            ) {
+                if (number.isNotEmpty()) {
+                    NumberMenuItem(R.drawable.ic_copy, stringResource(R.string.copy_number)) {
+                        numberMenu = false
+                        Clip.copyNumber(context, number)
+                    }
+                }
+                NumberMenuItem(R.drawable.ic_paste, stringResource(R.string.paste)) {
+                    numberMenu = false
+                    Clip.pasteText(context)?.let { pasted ->
+                        val cleaned = DialPad.clean(pasted)
+                        if (cleaned.isNotEmpty()) number = cleaned
+                    }
+                }
+                if (number.isNotEmpty()) {
+                    NumberMenuItem(R.drawable.ic_person_add, stringResource(R.string.save_to_contacts)) {
+                        numberMenu = false
+                        onSaveNumber(number)
+                    }
+                }
+            }
+        }
         Spacer(Modifier.height(8.dp))
         GlowLine(wide = number.isNotEmpty())
         Spacer(Modifier.height(10.dp))
@@ -170,6 +216,15 @@ fun KeypadScreen(
             }
         }
     }
+}
+
+@Composable
+private fun NumberMenuItem(icon: Int, label: String, onClick: () -> Unit) {
+    DropdownMenuItem(
+        text = { Text(label, style = MaterialTheme.typography.bodyLarge, color = Numio.colors.text) },
+        leadingIcon = { Icon(painterResource(icon), null, tint = Numio.colors.accentInk, modifier = Modifier.size(20.dp)) },
+        onClick = onClick,
+    )
 }
 
 // Thin amber line under the number; in dark mode it has a soft glow
