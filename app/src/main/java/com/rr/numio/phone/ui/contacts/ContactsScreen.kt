@@ -1,7 +1,10 @@
 package com.rr.numio.phone.ui.contacts
 
+import android.view.HapticFeedbackConstants
 import androidx.compose.foundation.border
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -34,6 +37,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -62,6 +66,7 @@ fun ContactsScreen(
     onOpen: (Contact) -> Unit,
     onCall: (String) -> Unit,
     onAdd: () -> Unit,
+    onLongPress: (Contact) -> Unit,
 ) {
     if (!hasPermission) {
         PermissionPrompt(
@@ -99,7 +104,7 @@ fun ContactsScreen(
                         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 20.dp),
                         horizontalArrangement = Arrangement.spacedBy(14.dp),
                     ) {
-                        items(favourites, key = { it.id }) { c -> FavouriteChip(c) { onOpen(c) } }
+                        items(favourites, key = { it.id }) { c -> FavouriteChip(c, onClick = { onOpen(c) }, onLongPress = { onLongPress(c) }) }
                     }
                 }
             }
@@ -111,7 +116,12 @@ fun ContactsScreen(
                     item(key = "s_$section") { SectionLabel(section) }
                 }
                 item(key = c.id) {
-                    ContactRow(c, onOpen = { onOpen(c) }, onCall = { c.numbers.firstOrNull()?.let { onCall(it.number) } })
+                    ContactRow(
+                        c,
+                        onOpen = { onOpen(c) },
+                        onCall = { c.numbers.firstOrNull()?.let { onCall(it.number) } },
+                        onLongPress = { onLongPress(c) },
+                    )
                 }
             }
             if (shown.isEmpty()) {
@@ -130,7 +140,7 @@ fun ContactsScreen(
 }
 
 @Composable
-private fun SearchField(query: String, onChange: (String) -> Unit) {
+internal fun SearchField(query: String, onChange: (String) -> Unit) {
     val hint = stringResource(R.string.search_contacts)
     Row(
         Modifier
@@ -171,13 +181,22 @@ private fun SearchField(query: String, onChange: (String) -> Unit) {
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun FavouriteChip(contact: Contact, onClick: () -> Unit) {
+private fun FavouriteChip(contact: Contact, onClick: () -> Unit, onLongPress: () -> Unit) {
+    val view = LocalView.current
     Column(
         Modifier
             .width(72.dp)
             .clip(RoundedCornerShape(12.dp))
-            .clickable(role = Role.Button, onClick = onClick)
+            .combinedClickable(
+                role = Role.Button,
+                onClick = onClick,
+                onLongClick = {
+                    view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                    onLongPress()
+                },
+            )
             .padding(vertical = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -193,13 +212,22 @@ private fun FavouriteChip(contact: Contact, onClick: () -> Unit) {
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun ContactRow(contact: Contact, onOpen: () -> Unit, onCall: () -> Unit) {
+private fun ContactRow(contact: Contact, onOpen: () -> Unit, onCall: () -> Unit, onLongPress: () -> Unit) {
     val context = LocalContext.current
+    val view = LocalView.current
     Row(
         Modifier
             .fillMaxWidth()
-            .clickable(role = Role.Button, onClick = onOpen)
+            .combinedClickable(
+                role = Role.Button,
+                onClick = onOpen,
+                onLongClick = {
+                    view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                    onLongPress()
+                },
+            )
             .padding(horizontal = 24.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

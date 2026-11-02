@@ -38,6 +38,13 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.rr.numio.phone.R
+import androidx.compose.ui.platform.LocalContext
+import com.rr.numio.phone.data.Clip
+import com.rr.numio.phone.data.ContactNumber
+import com.rr.numio.phone.data.PhoneType
+import com.rr.numio.phone.ui.common.ActionSheet
+import com.rr.numio.phone.ui.common.SheetAction
+import com.rr.numio.phone.ui.contacts.ContactPickerScreen
 import com.rr.numio.phone.ui.contacts.ContactsScreen
 import com.rr.numio.phone.ui.contacts.ContactDetailScreen
 import com.rr.numio.phone.ui.recents.NumberDetailScreen
@@ -94,6 +101,11 @@ fun PhoneApp(
     // Contact editor on top of everything: "new", "new:<number>" or "edit:<id>"
     var editor by rememberSaveable { mutableStateOf<String?>(null) }
     var saving by remember { mutableStateOf(false) }
+    // Long-press sheet: "n:<number>" (a call), "c:<id>" (a contact), "s:<number>" (save a number)
+    var sheet by rememberSaveable { mutableStateOf<String?>(null) }
+    // "Add to existing contact" picker for this number
+    var picker by rememberSaveable { mutableStateOf<String?>(null) }
+    val context = LocalContext.current
 
     // Read straight from Android's call log and contacts; re-read when access changes
     val hasLog = remember(permissionTick) { phone.hasCallLog() }
@@ -108,6 +120,8 @@ fun PhoneApp(
             showSettings = false
             detail = null
             editor = null
+            picker = null
+            sheet = null
         }
     }
 
@@ -130,11 +144,30 @@ fun PhoneApp(
                 LaunchedEffect(editing) { editor = null }
                 return@Box
             }
+            // "add:<id>:<number>" opens that contact with the number added at the end
+            val adding = if (editing.startsWith("add:")) {
+                val rest = editing.removePrefix("add:")
+                val id = rest.substringBefore(':')
+                contacts.firstOrNull { it.id.toString() == id }?.let { c -> c to rest.substringAfter(':') }
+            } else {
+                null
+            }
+            if (editing.startsWith("add:") && adding == null) {
+                LaunchedEffect(editing) { editor = null }
+                return@Box
+            }
             val prefill = if (editing.startsWith("new:")) editing.removePrefix("new:") else null
-            val initial = existing?.let { ContactDraft.from(it) } ?: ContactDraft.new(prefill)
+            val initial = when {
+                existing != null -> ContactDraft.from(existing)
+                adding != null -> ContactDraft.from(adding.first).let { d ->
+                    d.copy(numbers = d.numbers + ContactNumber(adding.second, null, PhoneType.MOBILE))
+                }
+                else -> ContactDraft.new(prefill)
+            }
+            val target = existing ?: adding?.first
             ContactEditScreen(
                 initial = initial,
-                photoUri = existing?.photoUri,
+                photoUri = target?.photoUri,
                 saving = saving,
                 onCancel = { editor = null },
                 onSave = { draft ->
@@ -157,6 +190,18 @@ fun PhoneApp(
                     }
                 },
             )
+        } else if (picker != null) {
+            val number = picker.orEmpty()
+            BackHandler { picker = null }
+            ContactPickerScreen(
+                number = number,
+                contacts = contacts,
+                onBack = { picker = null },
+                onPick = { c ->
+                    picker = null
+                    editor = "add:${c.id}:$number"
+                },
+            )
         } else if (current != null && !showSettings) {
             BackHandler { detail = null }
             if (current.startsWith("n:")) {
@@ -172,7 +217,7 @@ fun PhoneApp(
                     onOpenContact = {
                         contacts.firstOrNull { c -> c.numbers.any { PhoneNumbers.same(it.number, number) } }?.let(onOpenContact)
                     },
-                    onAddContact = { editor = "new:$number" },
+                    onAddContact = { sheet = "s:$number" },
                 )
             } else {
                 val contact = contacts.firstOrNull { it.id.toString() == current.removePrefix("c:") }
@@ -220,6 +265,7 @@ fun PhoneApp(
                             onAllow = onAllowCallLog,
                             onOpen = { detail = "n:$it" },
                             onCall = onCall,
+                            onLongPress = { sheet = "n:$it" },
                         )
                         Tab.CONTACTS -> ContactsScreen(
                             hasPermission = hasContacts,
@@ -228,6 +274,7 @@ fun PhoneApp(
                             onOpen = { detail = "c:${it.id}" },
                             onCall = onCall,
                             onAdd = { editor = "new" },
+                            onLongPress = { sheet = "c:${it.id}" },
                         )
                         Tab.KEYPAD -> KeypadScreen(
                             dialRequest = dialRequest,
@@ -235,11 +282,106 @@ fun PhoneApp(
                             notice = notice,
                             contacts = contacts,
                             onCall = onCall,
+                            onSaveNumber = { sheet = "s:$it" },
                         )
                     }
                 }
                 BottomTabs(selected = tab, onSelect = { tab = it })
             }
+        }
+
+        sheet?.let { open ->
+            LongPressSheet(
+                open = open,
+                contacts = contacts,
+                canPickContact = hasContacts,
+                callName = { n -> groups.firstOrNull { PhoneNumbers.same(it.number, n) }?.name },
+                onDismiss = { sheet = null },
+                onCall = onCall,
+                onMessage = onMessage,
+                onCopy = { Clip.copyNumber(context, it) },
+                onNewContact = { editor = "new:$it" },
+                onAddToExisting = { picker = it },
+                onViewContact = { detail = "c:${it.id}" },
+                onEditContact = { editor = "edit:${it.id}" },
+            )
+        }
+    }
+}
+
+/** What a long press offers, for a call, a contact, or a number to save. */
+@Composable
+private fun LongPressSheet(
+    open: String,
+    contacts: List<Contact>,
+    canPickContact: Boolean,
+    callName: (String) -> String?,
+    onDismiss: () -> Unit,
+    onCall: (String) -> Unit,
+    onMessage: (String) -> Unit,
+    onCopy: (String) -> Unit,
+    onNewContact: (String) -> Unit,
+    onAddToExisting: (String) -> Unit,
+    onViewContact: (Contact) -> Unit,
+    onEditContact: (Contact) -> Unit,
+) {
+    val context = LocalContext.current
+    val kind = open.substringBefore(':')
+    val value = open.substringAfter(':')
+
+    fun saveActions(number: String) = buildList {
+        add(SheetAction(R.drawable.ic_plus, context.getString(R.string.create_new_contact)) { onNewContact(number) })
+        if (canPickContact && contacts.isNotEmpty()) {
+            add(SheetAction(R.drawable.ic_person_add, context.getString(R.string.add_to_existing)) { onAddToExisting(number) })
+        }
+    }
+
+    when (kind) {
+        "c" -> {
+            val contact = contacts.firstOrNull { it.id.toString() == value }
+            if (contact == null) {
+                LaunchedEffect(open) { onDismiss() }
+                return
+            }
+            val first = contact.numbers.firstOrNull()?.number
+            val actions = buildList {
+                if (first != null) {
+                    add(SheetAction(R.drawable.ic_call, context.getString(R.string.call)) { onCall(first) })
+                    add(SheetAction(R.drawable.ic_message, context.getString(R.string.send_message)) { onMessage(first) })
+                }
+                if (contact.numbers.size == 1 && first != null) {
+                    add(SheetAction(R.drawable.ic_copy, context.getString(R.string.copy_number)) { onCopy(first) })
+                } else {
+                    contact.numbers.forEach { n ->
+                        val shown = PhoneData.format(context, n.number)
+                        add(SheetAction(R.drawable.ic_copy, context.getString(R.string.copy_this_number, shown)) { onCopy(n.number) })
+                    }
+                }
+                add(SheetAction(R.drawable.ic_pencil, context.getString(R.string.edit_contact)) { onEditContact(contact) })
+            }
+            val subtitle = first?.let { PhoneData.format(context, it) }
+            ActionSheet(contact.name, subtitle, contact.photoUri, actions, onDismiss)
+        }
+        "s" -> {
+            val shown = PhoneData.format(context, value)
+            ActionSheet(shown, null, null, saveActions(value), onDismiss)
+        }
+        else -> {
+            val number = value
+            val contact = contacts.firstOrNull { c -> c.numbers.any { PhoneNumbers.same(it.number, number) } }
+            val shown = PhoneData.format(context, number)
+            val title = contact?.name ?: callName(number)?.takeIf { it.isNotBlank() } ?: shown
+            val actions = buildList {
+                add(SheetAction(R.drawable.ic_call, context.getString(R.string.call)) { onCall(number) })
+                add(SheetAction(R.drawable.ic_message, context.getString(R.string.send_message)) { onMessage(number) })
+                add(SheetAction(R.drawable.ic_copy, context.getString(R.string.copy_number)) { onCopy(number) })
+                if (contact != null) {
+                    add(SheetAction(R.drawable.ic_contacts, context.getString(R.string.view_contact)) { onViewContact(contact) })
+                } else {
+                    addAll(saveActions(number))
+                }
+            }
+            ActionSheet(title, if (title != shown) shown else null, contact?.photoUri, actions, onDismiss)
         }
     }
 }

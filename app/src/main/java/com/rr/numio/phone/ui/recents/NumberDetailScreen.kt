@@ -1,5 +1,7 @@
 package com.rr.numio.phone.ui.recents
 
+import android.view.HapticFeedbackConstants
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -20,7 +22,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -29,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import com.rr.numio.phone.R
 import com.rr.numio.phone.call.formatDuration
 import com.rr.numio.phone.data.CallEntry
+import com.rr.numio.phone.data.Clip
 import com.rr.numio.phone.data.CallGrouping
 import com.rr.numio.phone.data.CallKind
 import com.rr.numio.phone.data.Contact
@@ -61,13 +66,25 @@ fun NumberDetailScreen(
         DetailTopBar(onBack = onBack, backLabel = stringResource(R.string.back))
         LazyColumn(Modifier.fillMaxSize()) {
             item {
+                val view = LocalView.current
                 Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     PersonAvatar(title, contact?.photoUri, 112.dp)
                     Spacer(Modifier.height(16.dp))
-                    Text(title, style = CallName.copy(fontSize = CallName.fontSize * 0.85f), color = Numio.colors.text, textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    if (contact != null || !name.isNullOrBlank()) {
-                        Spacer(Modifier.height(6.dp))
-                        Text(PhoneData.format(context, number), style = MaterialTheme.typography.bodyLarge, color = Numio.colors.textSoft)
+                    // Long press the name or number to copy the number
+                    Column(
+                        Modifier.pointerInput(number) {
+                            detectTapGestures(onLongPress = {
+                                view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                                Clip.copyNumber(context, number)
+                            })
+                        },
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Text(title, style = CallName.copy(fontSize = CallName.fontSize * 0.85f), color = Numio.colors.text, textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        if (contact != null || !name.isNullOrBlank()) {
+                            Spacer(Modifier.height(6.dp))
+                            Text(PhoneData.format(context, number), style = MaterialTheme.typography.bodyLarge, color = Numio.colors.textSoft)
+                        }
                     }
                     Spacer(Modifier.height(26.dp))
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
