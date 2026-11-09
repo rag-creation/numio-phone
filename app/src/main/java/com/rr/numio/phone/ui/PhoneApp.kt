@@ -39,6 +39,16 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.rr.numio.phone.R
 import com.rr.numio.phone.ui.contacts.ContactsScreen
+import com.rr.numio.phone.ui.contacts.ContactDetailScreen
+import com.rr.numio.phone.ui.recents.NumberDetailScreen
+import com.rr.numio.phone.data.CallGrouping
+import com.rr.numio.phone.data.Contact
+import com.rr.numio.phone.data.ContactDraft
+import com.rr.numio.phone.ui.contacts.ContactEditScreen
+import com.rr.numio.phone.data.PhoneData
+import com.rr.numio.phone.data.PhoneNumbers
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.remember
 import com.rr.numio.phone.ui.keypad.KeypadScreen
 import com.rr.numio.phone.ui.recents.RecentsScreen
 import com.rr.numio.phone.ui.settings.SettingsScreen
@@ -53,7 +63,7 @@ enum class Tab(@StringRes val label: Int, @DrawableRes val icon: Int) {
     KEYPAD(R.string.tab_keypad, R.drawable.ic_keypad),
 }
 
-/** The app shell: three tabs and a Settings page. No permissions are asked for here. */
+/** The app shell: three tabs, details pages and Settings. Permissions are asked for only from a tab's own button. */
 @Composable
 fun PhoneApp(
     themeMode: ThemeMode,
@@ -62,18 +72,42 @@ fun PhoneApp(
     isDefault: Boolean,
     onSetDefault: () -> Unit,
     onOpenDefaultApps: () -> Unit,
+    canFullScreen: Boolean,
+    onAllowFullScreen: () -> Unit,
     dialRequest: String?,
     onDialRequestUsed: () -> Unit,
     notice: String?,
     onCall: (String) -> Unit,
+    phone: PhoneData,
+    permissionTick: Int,
+    onAllowCallLog: () -> Unit,
+    onAllowContacts: () -> Unit,
+    onMessage: (String) -> Unit,
+    onOpenContact: (Contact) -> Unit,
+    onSaveContact: (ContactDraft, (Boolean) -> Unit) -> Unit,
+    onDeleteContact: (Long, (Boolean) -> Unit) -> Unit,
 ) {
     var tab by rememberSaveable { mutableStateOf(Tab.KEYPAD) }
     var showSettings by rememberSaveable { mutableStateOf(false) }
+    // Details page on top of the tabs: "n:<number>" for a number, "c:<id>" for a contact
+    var detail by rememberSaveable { mutableStateOf<String?>(null) }
+    // Contact editor on top of everything: "new", "new:<number>" or "edit:<id>"
+    var editor by rememberSaveable { mutableStateOf<String?>(null) }
+    var saving by remember { mutableStateOf(false) }
+
+    // Read straight from Android's call log and contacts; re-read when access changes
+    val hasLog = remember(permissionTick) { phone.hasCallLog() }
+    val hasContacts = remember(permissionTick) { phone.hasContacts() }
+    val entries by remember(permissionTick) { phone.callLog() }.collectAsState(initial = emptyList())
+    val contacts by remember(permissionTick) { phone.contacts() }.collectAsState(initial = emptyList())
+    val groups = remember(entries) { CallGrouping.group(entries) }
     // A tel: link from another app always lands on the keypad
     LaunchedEffect(dialRequest) {
         if (dialRequest != null) {
             tab = Tab.KEYPAD
             showSettings = false
+            detail = null
+            editor = null
         }
     }
 
@@ -82,7 +116,81 @@ fun PhoneApp(
             .fillMaxSize()
             .background(Numio.colors.background),
     ) {
-        if (showSettings) {
+        val editing = editor
+        val current = detail
+        if (editing != null) {
+            BackHandler { editor = null }
+            val existing = if (editing.startsWith("edit:")) {
+                contacts.firstOrNull { it.id.toString() == editing.removePrefix("edit:") }
+            } else {
+                null
+            }
+            if (editing.startsWith("edit:") && existing == null) {
+                // The contact was deleted elsewhere
+                LaunchedEffect(editing) { editor = null }
+                return@Box
+            }
+            val prefill = if (editing.startsWith("new:")) editing.removePrefix("new:") else null
+            val initial = existing?.let { ContactDraft.from(it) } ?: ContactDraft.new(prefill)
+            ContactEditScreen(
+                initial = initial,
+                photoUri = existing?.photoUri,
+                saving = saving,
+                onCancel = { editor = null },
+                onSave = { draft ->
+                    saving = true
+                    onSaveContact(draft) { ok ->
+                        saving = false
+                        if (ok) editor = null
+                    }
+                },
+                onDelete = existing?.let { c ->
+                    {
+                        saving = true
+                        onDeleteContact(c.id) { ok ->
+                            saving = false
+                            if (ok) {
+                                editor = null
+                                detail = null
+                            }
+                        }
+                    }
+                },
+            )
+        } else if (current != null && !showSettings) {
+            BackHandler { detail = null }
+            if (current.startsWith("n:")) {
+                val number = current.removePrefix("n:")
+                NumberDetailScreen(
+                    number = number,
+                    name = groups.firstOrNull { PhoneNumbers.same(it.number, number) }?.name,
+                    contact = contacts.firstOrNull { c -> c.numbers.any { PhoneNumbers.same(it.number, number) } },
+                    history = entries.filter { PhoneNumbers.same(it.number, number) },
+                    onBack = { detail = null },
+                    onCall = { onCall(number) },
+                    onMessage = { onMessage(number) },
+                    onOpenContact = {
+                        contacts.firstOrNull { c -> c.numbers.any { PhoneNumbers.same(it.number, number) } }?.let(onOpenContact)
+                    },
+                    onAddContact = { editor = "new:$number" },
+                )
+            } else {
+                val contact = contacts.firstOrNull { it.id.toString() == current.removePrefix("c:") }
+                if (contact == null) {
+                    LaunchedEffect(current) { detail = null }
+                } else {
+                    ContactDetailScreen(
+                        contact = contact,
+                        recent = entries.filter { e -> contact.numbers.any { PhoneNumbers.same(it.number, e.number) } },
+                        onBack = { detail = null },
+                        onCall = onCall,
+                        onMessage = onMessage,
+                        onOpenInContacts = { onOpenContact(contact) },
+                        onEdit = { editor = "edit:${contact.id}" },
+                    )
+                }
+            }
+        } else if (showSettings) {
             BackHandler { showSettings = false }
             SettingsScreen(
                 themeMode = themeMode,
@@ -91,6 +199,8 @@ fun PhoneApp(
                 isDefault = isDefault,
                 onSetDefault = onSetDefault,
                 onOpenDefaultApps = onOpenDefaultApps,
+                canFullScreen = canFullScreen,
+                onAllowFullScreen = onAllowFullScreen,
                 onBack = { showSettings = false },
             )
         } else {
@@ -103,8 +213,22 @@ fun PhoneApp(
                 TopBar(onSettings = { showSettings = true })
                 Box(Modifier.weight(1f).fillMaxWidth()) {
                     when (tab) {
-                        Tab.RECENTS -> RecentsScreen()
-                        Tab.CONTACTS -> ContactsScreen()
+                        Tab.RECENTS -> RecentsScreen(
+                            hasPermission = hasLog,
+                            groups = groups,
+                            contacts = contacts,
+                            onAllow = onAllowCallLog,
+                            onOpen = { detail = "n:$it" },
+                            onCall = onCall,
+                        )
+                        Tab.CONTACTS -> ContactsScreen(
+                            hasPermission = hasContacts,
+                            contacts = contacts,
+                            onAllow = onAllowContacts,
+                            onOpen = { detail = "c:${it.id}" },
+                            onCall = onCall,
+                            onAdd = { editor = "new" },
+                        )
                         Tab.KEYPAD -> KeypadScreen(
                             dialRequest = dialRequest,
                             onDialRequestUsed = onDialRequestUsed,

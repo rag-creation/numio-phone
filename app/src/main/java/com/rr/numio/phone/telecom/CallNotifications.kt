@@ -34,6 +34,26 @@ object CallNotifications {
         return NotificationManagerCompat.from(context).areNotificationsEnabled()
     }
 
+    /** Android 14+ lets people turn off full-screen call notifications per app. */
+    fun canFullScreen(context: Context): Boolean =
+        if (Build.VERSION.SDK_INT >= 34) {
+            context.getSystemService(NotificationManager::class.java).canUseFullScreenIntent()
+        } else {
+            true
+        }
+
+    /** The system page where full-screen notifications can be allowed for this app. */
+    fun fullScreenSettingsIntent(context: Context): Intent =
+        if (Build.VERSION.SDK_INT >= 34) {
+            Intent(
+                android.provider.Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT,
+                android.net.Uri.parse("package:" + context.packageName),
+            )
+        } else {
+            Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, context.packageName)
+        }
+
     private fun ensureChannels(context: Context) {
         val nm = context.getSystemService(NotificationManager::class.java)
         nm.createNotificationChannel(
@@ -59,6 +79,13 @@ object CallNotifications {
     var lastPostOk = false
         private set
 
+    /** True while our ringing / call screen is on display. */
+    @Volatile
+    var screenVisible = false
+
+    // Whether the posted notification is the pop-up kind, so we know to replace it
+    private var poppedUp = false
+
     fun update(context: Context, snapshot: CallSnapshot) {
         lastPostOk = false
         if (!canPost(context)) return
@@ -68,7 +95,12 @@ object CallNotifications {
             return
         }
         ensureChannels(context)
-        val notification = if (call.isRinging) incoming(context, call) else ongoing(context, call)
+        // Pop-up card only when you're somewhere else. While our own ringing screen is
+        // showing, a second card on top of it is just noise, so the notification stays quiet.
+        val popUp = call.isRinging && !screenVisible
+        if (poppedUp && !popUp) NotificationManagerCompat.from(context).cancel(ID)
+        poppedUp = popUp
+        val notification = if (popUp) incoming(context, call) else ongoing(context, call)
         try {
             NotificationManagerCompat.from(context).notify(ID, notification)
             lastPostOk = true
@@ -80,6 +112,7 @@ object CallNotifications {
     }
 
     fun cancelAll(context: Context) {
+        poppedUp = false
         NotificationManagerCompat.from(context).cancel(ID)
     }
 

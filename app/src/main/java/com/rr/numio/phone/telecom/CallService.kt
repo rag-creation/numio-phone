@@ -1,6 +1,8 @@
 package com.rr.numio.phone.telecom
 
+import android.app.KeyguardManager
 import android.content.Intent
+import android.os.PowerManager
 import android.telecom.Call
 import android.telecom.CallAudioState
 import android.telecom.InCallService
@@ -22,10 +24,15 @@ class CallService : InCallService() {
         super.onCallAdded(call)
         CallManager.onCallAdded(this, call)
         val info = CallManager.state.value.calls.lastOrNull()
-        // Incoming calls show through the call notification (full screen when locked,
-        // a card when unlocked). Outgoing calls open the call screen straight away.
-        // Without notification access we open the screen directly, so a call is never missed.
-        if (info == null || !info.isRinging || !CallNotifications.lastPostOk) {
+        // Outgoing calls open the call screen straight away. An incoming call opens it
+        // too when the phone is locked or the screen is off: the screen wakes itself, and
+        // it works even when Android doesn't allow our full-screen notification (Samsung
+        // and sideloaded apps). When you're using the phone, the call card shows instead.
+        // Without notification access we always open the screen, so a call is never missed.
+        val power = getSystemService(PowerManager::class.java)
+        val keyguard = getSystemService(KeyguardManager::class.java)
+        val lockedOrOff = !power.isInteractive || keyguard.isKeyguardLocked
+        if (info == null || !info.isRinging || lockedOrOff || !CallNotifications.lastPostOk) {
             startActivity(
                 Intent(this, CallActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
             )

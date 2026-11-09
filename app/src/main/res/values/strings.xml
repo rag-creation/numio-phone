@@ -15,10 +15,64 @@
     <string name="role_unavailable">This phone doesn\'t let other apps be the default phone app.</string>
     <string name="call_failed">Couldn\'t start the call. Please try again.</string>
 
-    <string name="recents_empty_title">Call history comes next</string>
-    <string name="recents_empty_body">Your calls will show here. Phone by Numio will ask for call log access only when this page is ready.</string>
-    <string name="contacts_empty_title">Contacts come next</string>
-    <string name="contacts_empty_body">Your contacts will show here. Phone by Numio will ask for contacts access only when this page is ready.</string>
+    <!-- Recents -->
+    <string name="recents_permission_title">See your call history</string>
+    <string name="recents_permission_body">Phone by Numio reads Android\'s own call log to show your calls here. It\'s read on your phone only and never copied or sent anywhere.</string>
+    <string name="allow_call_history">Allow call history</string>
+    <string name="recents_none_title">No calls yet</string>
+    <string name="recents_none_body">Calls you make and receive will show here.</string>
+    <string name="today">Today</string>
+    <string name="yesterday">Yesterday</string>
+    <string name="unknown">Unknown</string>
+    <string name="kind_incoming">Incoming</string>
+    <string name="kind_outgoing">Outgoing</string>
+    <string name="kind_missed">Missed</string>
+    <string name="kind_declined">Declined</string>
+    <string name="kind_blocked">Blocked</string>
+    <string name="history">History</string>
+    <string name="message">Message</string>
+    <string name="contact">Contact</string>
+    <string name="add_contact">Add contact</string>
+    <string name="no_app_for_this">No app on this phone can do that.</string>
+
+    <!-- Contacts -->
+    <string name="contacts_permission_title">See your contacts</string>
+    <string name="contacts_permission_body">Phone by Numio reads the contacts on your phone to show names and let you call them. It only changes a contact when you edit and save it, and never copies or sends them anywhere.</string>
+    <string name="allow_contacts">Allow contacts</string>
+    <string name="contacts_none_title">No contacts</string>
+    <string name="contacts_none_body">Contacts saved on your phone will show here.</string>
+    <string name="search_contacts">Search name or number</string>
+    <string name="clear">Clear</string>
+    <string name="favourites">Favourites</string>
+    <string name="favourite">Favourite</string>
+    <string name="no_matches">No contacts match.</string>
+    <string name="numbers">Numbers</string>
+    <string name="recent_calls">Recent calls</string>
+    <string name="open_in_contacts">Open in Contacts app</string>
+
+    <!-- Contact editor -->
+    <string name="new_contact">New contact</string>
+    <string name="edit_contact">Edit contact</string>
+    <string name="cancel">Cancel</string>
+    <string name="name">Name</string>
+    <string name="name_hint">Name</string>
+    <string name="number_hint">Phone number</string>
+    <string name="add_number">Add another number</string>
+    <string name="remove_number">Remove number</string>
+    <string name="type_mobile">Mobile</string>
+    <string name="type_home">Home</string>
+    <string name="type_work">Work</string>
+    <string name="type_other">Other</string>
+    <string name="add_to_favourites">Add to favourites</string>
+    <string name="in_favourites">In favourites</string>
+    <string name="delete_contact">Delete contact</string>
+    <string name="delete_title">Delete %1$s?</string>
+    <string name="delete_body">This removes the contact from your phone for every app.</string>
+    <string name="delete">Delete</string>
+    <string name="save">Save</string>
+    <string name="saving">Saving…</string>
+    <string name="save_failed">Couldn\'t save. Please try again.</string>
+    <string name="need_write_contacts">Phone by Numio needs contacts access to save contacts.</string>
 
     <string name="settings">Settings</string>
     <string name="default_phone_app">Default phone app</string>
@@ -26,6 +80,8 @@
     <string name="default_no">Phone by Numio isn\'t your default phone app yet, so calls ring in your other phone app.</string>
     <string name="set_default">Set as default phone app</string>
     <string name="change_default">Change default phone app</string>
+    <string name="full_screen_off">Full-screen calls are off, so the ringing screen may not appear on the lock screen.</string>
+    <string name="allow_full_screen">Allow full-screen calls</string>
     <string name="appearance">Appearance</string>
     <string name="theme_dark">Dark</string>
     <string name="theme_light">Light</string>
