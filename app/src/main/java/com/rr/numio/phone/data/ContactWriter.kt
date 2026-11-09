@@ -48,6 +48,7 @@ class ContactWriter(context: Context) {
                 .withValue(Data.MIMETYPE, Phone.CONTENT_ITEM_TYPE)
                 .withValue(Phone.NUMBER, n.number)
                 .withValue(Phone.TYPE, n.type)
+                .withValue(Phone.LABEL, labelFor(n))
                 .build()
         }
         resolver.applyBatch(ContactsContract.AUTHORITY, ops)
@@ -80,16 +81,26 @@ class ContactWriter(context: Context) {
                 .build()
         }
 
-        // Numbers: replace the whole set with what the editor shows
-        ops += ContentProviderOperation.newDelete(Data.CONTENT_URI)
-            .withSelection("$inRaws AND ${Data.MIMETYPE} = ?", arrayOf(Phone.CONTENT_ITEM_TYPE))
-            .build()
-        for (n in draft.cleanNumbers) {
+        // Numbers: change each saved number where it lives, so it stays in its own account
+        // and keeps its custom label; remove only what was removed, add only what's new
+        val plan = ContactNumberPlan.plan(existingNumbers(rawIds), draft.cleanNumbers)
+        for ((dataId, n) in plan.updates) {
+            ops += ContentProviderOperation.newUpdate(ContentUris.withAppendedId(Data.CONTENT_URI, dataId))
+                .withValue(Phone.NUMBER, n.number)
+                .withValue(Phone.TYPE, n.type)
+                .withValue(Phone.LABEL, labelFor(n))
+                .build()
+        }
+        for (dataId in plan.deletes) {
+            ops += ContentProviderOperation.newDelete(ContentUris.withAppendedId(Data.CONTENT_URI, dataId)).build()
+        }
+        for (n in plan.inserts) {
             ops += ContentProviderOperation.newInsert(Data.CONTENT_URI)
                 .withValue(Data.RAW_CONTACT_ID, main)
                 .withValue(Data.MIMETYPE, Phone.CONTENT_ITEM_TYPE)
                 .withValue(Phone.NUMBER, n.number)
                 .withValue(Phone.TYPE, n.type)
+                .withValue(Phone.LABEL, labelFor(n))
                 .build()
         }
 
@@ -111,6 +122,27 @@ class ContactWriter(context: Context) {
             null,
         )?.use { c -> while (c.moveToNext()) ids += c.getLong(0) }
         return ids
+    }
+
+    /** Android only keeps a label for the custom type. */
+    private fun labelFor(n: ContactNumber): String? =
+        if (n.type == PhoneType.CUSTOM) n.label?.trim()?.ifBlank { null } else null
+
+    private fun existingNumbers(rawIds: List<Long>): List<ContactNumberPlan.Existing> {
+        val out = mutableListOf<ContactNumberPlan.Existing>()
+        resolver.query(
+            Data.CONTENT_URI,
+            arrayOf(Data._ID, Phone.NUMBER, Phone.TYPE, Phone.LABEL),
+            "${Data.RAW_CONTACT_ID} IN (${rawIds.joinToString(",")}) AND ${Data.MIMETYPE} = ?",
+            arrayOf(Phone.CONTENT_ITEM_TYPE),
+            null,
+        )?.use { c ->
+            while (c.moveToNext()) {
+                val number = c.getString(1) ?: continue
+                out += ContactNumberPlan.Existing(c.getLong(0), number, c.getInt(2), c.getString(3))
+            }
+        }
+        return out
     }
 
     private fun hasRow(rawIds: List<Long>, mime: String): Boolean =

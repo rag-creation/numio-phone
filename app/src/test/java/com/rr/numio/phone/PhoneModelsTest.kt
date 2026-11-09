@@ -5,8 +5,10 @@ import com.rr.numio.phone.data.CallGrouping
 import com.rr.numio.phone.data.CallKind
 import com.rr.numio.phone.data.Contact
 import com.rr.numio.phone.data.ContactNumber
+import com.rr.numio.phone.data.ContactNumberPlan
 import com.rr.numio.phone.data.ContactSearch
 import com.rr.numio.phone.data.PhoneNumbers
+import com.rr.numio.phone.data.PhoneType
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -112,5 +114,90 @@ class ContactDraftTest {
         assertEquals(t.HOME, t.next(t.MOBILE))
         assertEquals(t.MOBILE, t.next(t.OTHER))
         assertEquals(t.HOME, t.next(99))
+    }
+}
+
+class ContactNumberPlanTest {
+    private fun e(id: Long, number: String, type: Int = PhoneType.MOBILE, label: String? = null) =
+        ContactNumberPlan.Existing(id, number, type, label)
+
+    private fun kept(number: String, type: Int = PhoneType.MOBILE, label: String? = null, from: String = number) =
+        ContactNumber(number, label, type, from)
+
+    @Test
+    fun unchangedNumbersAreLeftAlone() {
+        val plan = ContactNumberPlan.plan(
+            listOf(e(1, "+971501234567"), e(2, "0441234567", PhoneType.CUSTOM, "Dubai SIM")),
+            listOf(kept("+971501234567"), kept("0441234567", PhoneType.CUSTOM, "Dubai SIM")),
+        )
+        assertTrue(plan.updates.isEmpty())
+        assertTrue(plan.deletes.isEmpty())
+        assertTrue(plan.inserts.isEmpty())
+    }
+
+    @Test
+    fun customLabelIsKeptWhenTheNumberIsChanged() {
+        val plan = ContactNumberPlan.plan(
+            listOf(e(5, "0441234567", PhoneType.CUSTOM, "Dubai SIM")),
+            listOf(kept("0441234999", PhoneType.CUSTOM, "Dubai SIM", from = "0441234567")),
+        )
+        assertEquals(1, plan.updates.size)
+        assertEquals(5L, plan.updates[0].first)
+        assertEquals("0441234999", plan.updates[0].second.number)
+        assertEquals("Dubai SIM", plan.updates[0].second.label)
+        assertTrue(plan.deletes.isEmpty())
+        assertTrue(plan.inserts.isEmpty())
+    }
+
+    @Test
+    fun removedNumbersAreDeletedAndNewOnesAdded() {
+        val plan = ContactNumberPlan.plan(
+            listOf(e(1, "0501234567"), e(2, "0551234567")),
+            listOf(kept("0501234567"), ContactNumber("+919876543210", null, PhoneType.HOME)),
+        )
+        assertEquals(listOf(2L), plan.deletes)
+        assertEquals(listOf("+919876543210"), plan.inserts.map { it.number })
+        assertTrue(plan.updates.isEmpty())
+    }
+
+    @Test
+    fun changingTypeUpdatesInPlaceAndDropsTheOldLabel() {
+        val plan = ContactNumberPlan.plan(
+            listOf(e(3, "0501234567", PhoneType.CUSTOM, "Old phone")),
+            listOf(kept("0501234567", PhoneType.WORK, "Old phone")),
+        )
+        assertEquals(3L, plan.updates.single().first)
+        assertEquals(PhoneType.WORK, plan.updates.single().second.type)
+        assertEquals(null, plan.updates.single().second.label)
+    }
+
+    @Test
+    fun sameNumberSavedTwiceKeepsBothCopiesWhenUntouched() {
+        // Shown as one row in the editor, but both copies stay on the phone
+        val plan = ContactNumberPlan.plan(
+            listOf(e(1, "+971501234567"), e(2, "0501234567")),
+            listOf(kept("+971501234567")),
+        )
+        assertTrue(plan.deletes.isEmpty())
+        assertTrue(plan.updates.isEmpty())
+        assertTrue(plan.inserts.isEmpty())
+    }
+
+    @Test
+    fun sameNumberSavedTwiceLeavesNoStaleCopyWhenChanged() {
+        val plan = ContactNumberPlan.plan(
+            listOf(e(1, "+971501234567"), e(2, "0501234567")),
+            listOf(kept("0509999999", from = "+971501234567")),
+        )
+        assertEquals(1L, plan.updates.single().first)
+        assertEquals(listOf(2L), plan.deletes)
+        assertTrue(plan.inserts.isEmpty())
+    }
+
+    @Test
+    fun typeCycleIncludesTheNumbersOwnLabel() {
+        assertEquals(PhoneType.MOBILE, PhoneType.next(PhoneType.CUSTOM, "Dubai SIM"))
+        assertEquals(PhoneType.CUSTOM, PhoneType.next(PhoneType.OTHER, "Dubai SIM"))
+        assertEquals(PhoneType.MOBILE, PhoneType.next(PhoneType.OTHER))
     }
 }

@@ -39,12 +39,20 @@ data class Contact(
 )
 
 /**
- * One saved number. [type] uses Android's phone types (2 = mobile, 1 = home, 3 = work,
- * 7 = other); [label] is the text shown for it.
+ * One saved number. [type] uses Android's phone types (0 = custom, 2 = mobile, 1 = home,
+ * 3 = work, 7 = other); [label] is the text shown for it (for a custom type, the user's own
+ * label, e.g. "Dubai SIM"). [from] is the number as it was when the editor opened, so a
+ * save changes that same entry instead of replacing it; null for a newly added number.
  */
-data class ContactNumber(val number: String, val label: String?, val type: Int = PhoneType.MOBILE)
+data class ContactNumber(
+    val number: String,
+    val label: String?,
+    val type: Int = PhoneType.MOBILE,
+    val from: String? = null,
+)
 
 object PhoneType {
+    const val CUSTOM = 0
     const val HOME = 1
     const val MOBILE = 2
     const val WORK = 3
@@ -53,7 +61,60 @@ object PhoneType {
     /** The four choices the editor cycles through. */
     val choices = listOf(MOBILE, HOME, WORK, OTHER)
 
-    fun next(type: Int): Int = choices[(choices.indexOf(type).coerceAtLeast(0) + 1) % choices.size]
+    /**
+     * Next type when the type button is tapped. A number that came with its own label
+     * ([customLabel]) keeps that label in the cycle, so tapping round brings it back.
+     */
+    fun next(type: Int, customLabel: String? = null): Int {
+        val cycle = if (!customLabel.isNullOrBlank()) listOf(CUSTOM) + choices else choices
+        return cycle[(cycle.indexOf(type).coerceAtLeast(0) + 1) % cycle.size]
+    }
+}
+
+/**
+ * Works out how to save edited numbers without losing anything the editor doesn't show:
+ * each number already on the phone is changed in place (so it stays in its own account,
+ * keeps its custom label and other details), removed only if the user removed it, and only
+ * truly new numbers are added.
+ */
+object ContactNumberPlan {
+    /** A number already saved on the phone: its row id in Android's contacts database. */
+    data class Existing(val dataId: Long, val number: String, val type: Int, val label: String?)
+
+    data class Plan(
+        val updates: List<Pair<Long, ContactNumber>>,
+        val deletes: List<Long>,
+        val inserts: List<ContactNumber>,
+    )
+
+    fun plan(existing: List<Existing>, edited: List<ContactNumber>): Plan {
+        val updates = mutableListOf<Pair<Long, ContactNumber>>()
+        val deletes = mutableListOf<Long>()
+        val claimed = mutableSetOf<Int>() // edited rows that already have their saved entry
+
+        for (e in existing) {
+            val i = edited.indexOfFirst { it.from != null && PhoneNumbers.same(it.from, e.number) }
+            if (i < 0) {
+                deletes += e.dataId // removed in the editor
+                continue
+            }
+            val n = edited[i]
+            val sameNumber = PhoneNumbers.normalize(n.number) == PhoneNumbers.normalize(e.number)
+            val label = if (n.type == PhoneType.CUSTOM) n.label else null
+            val sameType = n.type == e.type && (n.type != PhoneType.CUSTOM || label == e.label)
+            if (i in claimed) {
+                // The same number saved twice (e.g. with and without +971) shows as one row.
+                // Leave the extra copy alone unless the number itself was changed.
+                if (!PhoneNumbers.same(n.number, e.number)) deletes += e.dataId
+                continue
+            }
+            claimed += i
+            if (!sameNumber || !sameType) updates += e.dataId to n.copy(label = label)
+        }
+        val inserts = edited.filterIndexed { i, _ -> i !in claimed }
+            .map { it.copy(label = if (it.type == PhoneType.CUSTOM) it.label else null) }
+        return Plan(updates, deletes, inserts)
+    }
 }
 
 /** What the contact editor saves. [id] is null for a new contact. */
@@ -83,7 +144,12 @@ data class ContactDraft(
     val savedName: String get() = name.trim().ifBlank { cleanNumbers.firstOrNull()?.number.orEmpty() }
 
     companion object {
-        fun from(contact: Contact) = ContactDraft(contact.id, contact.name, contact.numbers, contact.starred)
+        fun from(contact: Contact) = ContactDraft(
+            contact.id,
+            contact.name,
+            contact.numbers.map { it.copy(from = it.number) },
+            contact.starred,
+        )
         fun new(number: String? = null) = ContactDraft(
             id = null,
             name = "",

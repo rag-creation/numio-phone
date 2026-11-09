@@ -72,9 +72,19 @@ fun ContactEditScreen(
     // Numbers as two parallel lists so they survive rotation with rememberSaveable
     var numbers by rememberSaveable { mutableStateOf(initial.numbers.map { it.number }.ifEmpty { listOf("") }) }
     var types by rememberSaveable { mutableStateOf(initial.numbers.map { it.type }.ifEmpty { listOf(PhoneType.MOBILE) }) }
+    // Custom labels ("Dubai SIM") and where each number came from, so saving keeps them
+    var labels by rememberSaveable {
+        mutableStateOf(initial.numbers.map { if (it.type == PhoneType.CUSTOM) it.label else null }.ifEmpty { listOf(null) })
+    }
+    var origins by rememberSaveable { mutableStateOf(initial.numbers.map { it.from }.ifEmpty { listOf(null) }) }
     var confirmDelete by remember { mutableStateOf(false) }
 
-    val draft = ContactDraft(initial.id, name, numbers.zip(types) { n, t -> ContactNumber(n, null, t) }, starred)
+    val draft = ContactDraft(
+        initial.id,
+        name,
+        numbers.indices.map { i -> ContactNumber(numbers[i], labels[i], types[i], origins[i]) },
+        starred,
+    )
     val isNew = initial.id == null
 
     Column(
@@ -123,15 +133,15 @@ fun ContactEditScreen(
                         )
                     }
                     Spacer(Modifier.width(8.dp))
-                    // Tap to cycle Mobile → Home → Work → Other
+                    // Tap to cycle Mobile → Home → Work → Other (and back to the number's own label, if it had one)
                     Text(
-                        typeName(types[i]),
+                        typeName(types[i], labels[i]),
                         style = MaterialTheme.typography.labelLarge,
                         color = Numio.colors.accentInk,
                         modifier = Modifier
                             .clip(RoundedCornerShape(16.dp))
                             .border(1.dp, Numio.colors.ring, RoundedCornerShape(16.dp))
-                            .clickable(role = Role.Button) { types = types.toMutableList().also { it[i] = PhoneType.next(it[i]) } }
+                            .clickable(role = Role.Button) { types = types.toMutableList().also { it[i] = PhoneType.next(it[i], labels[i]) } }
                             .padding(horizontal = 12.dp, vertical = 12.dp),
                     )
                     if (numbers.size > 1) {
@@ -143,6 +153,8 @@ fun ContactEditScreen(
                                 .clickable(role = Role.Button) {
                                     numbers = numbers.toMutableList().also { it.removeAt(i) }
                                     types = types.toMutableList().also { it.removeAt(i) }
+                                    labels = labels.toMutableList().also { it.removeAt(i) }
+                                    origins = origins.toMutableList().also { it.removeAt(i) }
                                 },
                             contentAlignment = Alignment.Center,
                         ) {
@@ -157,6 +169,8 @@ fun ContactEditScreen(
                     .clickable(role = Role.Button) {
                         numbers = numbers + ""
                         types = types + PhoneType.MOBILE
+                        labels = labels + null
+                        origins = origins + null
                     }
                     .padding(horizontal = 8.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -257,14 +271,17 @@ private fun FieldLabel(text: String) {
 }
 
 @Composable
-private fun typeName(type: Int): String = stringResource(
-    when (type) {
-        PhoneType.HOME -> R.string.type_home
-        PhoneType.WORK -> R.string.type_work
-        PhoneType.OTHER -> R.string.type_other
-        else -> R.string.type_mobile
-    },
-)
+private fun typeName(type: Int, customLabel: String?): String {
+    if (type == PhoneType.CUSTOM && !customLabel.isNullOrBlank()) return customLabel
+    return stringResource(
+        when (type) {
+            PhoneType.HOME -> R.string.type_home
+            PhoneType.WORK -> R.string.type_work
+            PhoneType.OTHER -> R.string.type_other
+            else -> R.string.type_mobile
+        },
+    )
+}
 
 @Composable
 private fun Field(
