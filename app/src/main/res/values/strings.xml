@@ -26,6 +26,8 @@
     <string name="default_no">Phone by Numio isn\'t your default phone app yet, so calls ring in your other phone app.</string>
     <string name="set_default">Set as default phone app</string>
     <string name="change_default">Change default phone app</string>
+    <string name="full_screen_off">Full-screen calls are off, so the ringing screen may not appear on the lock screen.</string>
+    <string name="allow_full_screen">Allow full-screen calls</string>
     <string name="appearance">Appearance</string>
     <string name="theme_dark">Dark</string>
     <string name="theme_light">Light</string>
