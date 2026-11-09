@@ -160,7 +160,7 @@ object VCard {
         return bytes.toString("UTF-8")
     }
 
-    private fun escape(s: String) = s.replace("\\", "\\\\").replace(";", "\;").replace(",", "\\,").replace("\n", "\\n")
+    private fun escape(s: String) = s.replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,").replace("\n", "\\n")
 
     private fun unescape(s: String) = buildString {
         var i = 0
