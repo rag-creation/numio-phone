@@ -4,7 +4,12 @@ import android.content.ContentProviderOperation
 import android.content.ContentUris
 import android.content.Context
 import android.provider.ContactsContract
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.net.Uri
 import android.provider.ContactsContract.CommonDataKinds.Phone
+import android.provider.ContactsContract.CommonDataKinds.Photo
+import java.io.ByteArrayOutputStream
 import android.provider.ContactsContract.CommonDataKinds.StructuredName
 import android.provider.ContactsContract.Data
 import android.provider.ContactsContract.RawContacts
@@ -49,6 +54,13 @@ class ContactWriter(context: Context) {
                 .withValue(Phone.NUMBER, n.number)
                 .withValue(Phone.TYPE, n.type)
                 .withValue(Phone.LABEL, labelFor(n))
+                .build()
+        }
+        photoBytes(draft.newPhoto)?.let { bytes ->
+            ops += ContentProviderOperation.newInsert(Data.CONTENT_URI)
+                .withValueBackReference(Data.RAW_CONTACT_ID, 0)
+                .withValue(Data.MIMETYPE, Photo.CONTENT_ITEM_TYPE)
+                .withValue(Photo.PHOTO, bytes)
                 .build()
         }
         resolver.applyBatch(ContactsContract.AUTHORITY, ops)
@@ -104,6 +116,21 @@ class ContactWriter(context: Context) {
                 .build()
         }
 
+        // Photo: replace or remove
+        val bytes = photoBytes(draft.newPhoto)
+        if (bytes != null || draft.removePhoto) {
+            ops += ContentProviderOperation.newDelete(Data.CONTENT_URI)
+                .withSelection("$inRaws AND ${Data.MIMETYPE} = ?", arrayOf(Photo.CONTENT_ITEM_TYPE))
+                .build()
+        }
+        if (bytes != null) {
+            ops += ContentProviderOperation.newInsert(Data.CONTENT_URI)
+                .withValue(Data.RAW_CONTACT_ID, main)
+                .withValue(Data.MIMETYPE, Photo.CONTENT_ITEM_TYPE)
+                .withValue(Photo.PHOTO, bytes)
+                .build()
+        }
+
         // Favourite
         ops += ContentProviderOperation.newUpdate(ContentUris.withAppendedId(ContactsContract.Contacts.CONTENT_URI, contactId))
             .withValue(ContactsContract.Contacts.STARRED, if (draft.starred) 1 else 0)
@@ -122,6 +149,33 @@ class ContactWriter(context: Context) {
             null,
         )?.use { c -> while (c.moveToNext()) ids += c.getLong(0) }
         return ids
+    }
+
+    /**
+     * The picked picture as a JPEG for the contacts database: square-cropped from the
+     * middle and at most 720 px, so it stays small. Null if there's no picture.
+     */
+    private fun photoBytes(uri: String?): ByteArray? {
+        if (uri.isNullOrBlank()) return null
+        return try {
+            val u = Uri.parse(uri)
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            resolver.openInputStream(u)?.use { BitmapFactory.decodeStream(it, null, bounds) }
+            var sample = 1
+            while (minOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= 720) sample *= 2
+            val full = resolver.openInputStream(u)?.use {
+                BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply { inSampleSize = sample })
+            } ?: return null
+            val side = minOf(full.width, full.height)
+            val square = Bitmap.createBitmap(full, (full.width - side) / 2, (full.height - side) / 2, side, side)
+            val scaled = if (side > 720) Bitmap.createScaledBitmap(square, 720, 720, true) else square
+            ByteArrayOutputStream().use { out ->
+                scaled.compress(Bitmap.CompressFormat.JPEG, 88, out)
+                out.toByteArray()
+            }
+        } catch (e: Exception) {
+            null
+        }
     }
 
     /** Android only keeps a label for the custom type. */

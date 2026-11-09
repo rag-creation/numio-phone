@@ -91,6 +91,8 @@ fun SettingsScreen(
     blockedCodes: Set<String>,
     onAddBlockedCode: (String) -> Unit,
     onRemoveBlockedCode: (String) -> Unit,
+    onExportContacts: () -> Unit,
+    onImportContacts: () -> Unit,
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -220,6 +222,17 @@ fun SettingsScreen(
                     onClear = { onClearSpeedDial(d) },
                 )
             }
+
+            SectionLabel(stringResource(R.string.contacts_backup))
+            Text(
+                stringResource(R.string.contacts_backup_body),
+                style = MaterialTheme.typography.bodyMedium,
+                color = Numio.colors.textSoft,
+            )
+            Spacer(Modifier.height(12.dp))
+            OutlineButton(stringResource(R.string.export_contacts), onExportContacts)
+            Spacer(Modifier.height(10.dp))
+            OutlineButton(stringResource(R.string.import_contacts), onImportContacts)
 
             SectionLabel(stringResource(R.string.appearance))
             ThemeChooser(selected = themeMode, onSelect = onThemeMode)

@@ -51,6 +51,9 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.rr.numio.phone.R
 import com.rr.numio.phone.data.ContactDraft
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import com.rr.numio.phone.data.ContactNumber
 import com.rr.numio.phone.data.PhoneType
 import com.rr.numio.phone.ui.common.DetailTopBar
@@ -78,12 +81,25 @@ fun ContactEditScreen(
     }
     var origins by rememberSaveable { mutableStateOf(initial.numbers.map { it.from }.ifEmpty { listOf(null) }) }
     var confirmDelete by remember { mutableStateOf(false) }
+    // Photo: a newly picked one, or the current one taken off
+    var newPhoto by rememberSaveable { mutableStateOf<String?>(null) }
+    var removePhoto by rememberSaveable { mutableStateOf(false) }
+    val shownPhoto = newPhoto ?: photoUri.takeUnless { removePhoto }
+    // Android's photo picker: no storage permission needed
+    val pickPhoto = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) {
+            newPhoto = uri.toString()
+            removePhoto = false
+        }
+    }
 
     val draft = ContactDraft(
         initial.id,
         name,
         numbers.indices.map { i -> ContactNumber(numbers[i], labels[i], types[i], origins[i]) },
         starred,
+        newPhoto = newPhoto,
+        removePhoto = removePhoto && newPhoto == null,
     )
     val isNew = initial.id == null
 
@@ -108,8 +124,34 @@ fun ContactEditScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 24.dp),
         ) {
-            Box(Modifier.fillMaxWidth().padding(vertical = 8.dp), contentAlignment = Alignment.Center) {
-                PersonAvatar(name.ifBlank { null }, photoUri, 96.dp, ring = if (starred) Numio.colors.accent else Numio.colors.ring)
+            // Tap the picture to choose a photo from the gallery
+            Column(Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Box(
+                    Modifier
+                        .clip(CircleShape)
+                        .clickable(role = Role.Button) {
+                            pickPhoto.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                        },
+                ) {
+                    PersonAvatar(name.ifBlank { null }, shownPhoto, 96.dp, ring = if (starred) Numio.colors.accent else Numio.colors.ring)
+                }
+                Text(
+                    stringResource(if (shownPhoto == null) R.string.add_photo else R.string.remove_photo),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = Numio.colors.accentInk,
+                    modifier = Modifier
+                        .padding(top = 6.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable(role = Role.Button) {
+                            if (shownPhoto == null) {
+                                pickPhoto.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                            } else {
+                                newPhoto = null
+                                removePhoto = true
+                            }
+                        }
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                )
             }
 
             FieldLabel(stringResource(R.string.name))

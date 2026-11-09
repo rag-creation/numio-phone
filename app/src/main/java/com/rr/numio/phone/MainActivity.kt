@@ -76,6 +76,8 @@ class MainActivity : ComponentActivity() {
     // Saving contacts needs write access, asked the first time you press Save
     private var pendingWrite: (() -> Unit)? = null
     private var pendingWriteFailed: (() -> Unit)? = null
+    // Which write access the waiting action needs (contacts or call history)
+    private var pendingWritePermission = Manifest.permission.WRITE_CONTACTS
     private val writeRequest = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
         lastAccess = phone.hasCallLog() to phone.hasContacts()
         permissionTick++
@@ -83,7 +85,7 @@ class MainActivity : ComponentActivity() {
         val fail = pendingWriteFailed
         pendingWrite = null
         pendingWriteFailed = null
-        if (has(Manifest.permission.WRITE_CONTACTS)) go?.invoke() else fail?.invoke()
+        if (has(pendingWritePermission)) go?.invoke() else fail?.invoke()
     }
 
     /** Runs [write] off the main thread once write access is there; [done] gets the result. */
@@ -100,11 +102,35 @@ class MainActivity : ComponentActivity() {
             run()
         } else {
             pendingWrite = run
+            pendingWritePermission = Manifest.permission.WRITE_CONTACTS
             pendingWriteFailed = {
                 Toast.makeText(this, R.string.need_write_contacts, Toast.LENGTH_LONG).show()
                 done(false)
             }
             writeRequest.launch(arrayOf(Manifest.permission.READ_CONTACTS, Manifest.permission.WRITE_CONTACTS))
+        }
+    }
+
+    /** Same as [withContactsWrite], for deleting call history. */
+    private fun withCallLogWrite(done: (Boolean) -> Unit, write: () -> Boolean) {
+        val run = {
+            lifecycleScope.launch {
+                val ok = withContext(Dispatchers.IO) { write() }
+                if (!ok) Toast.makeText(this@MainActivity, R.string.delete_failed, Toast.LENGTH_LONG).show()
+                done(ok)
+            }
+            Unit
+        }
+        if (has(Manifest.permission.WRITE_CALL_LOG)) {
+            run()
+        } else {
+            pendingWrite = run
+            pendingWritePermission = Manifest.permission.WRITE_CALL_LOG
+            pendingWriteFailed = {
+                Toast.makeText(this, R.string.need_write_call_log, Toast.LENGTH_LONG).show()
+                done(false)
+            }
+            writeRequest.launch(arrayOf(Manifest.permission.READ_CALL_LOG, Manifest.permission.WRITE_CALL_LOG))
         }
     }
 
@@ -199,6 +225,16 @@ class MainActivity : ComponentActivity() {
                     settings = settings,
                     onDeleteContact = { id, done ->
                         withContactsWrite(done) { ContactWriter(this).delete(id) }
+                    },
+                    onDeleteCalls = { ids, done ->
+                        withCallLogWrite(done) { phone.deleteCalls(ids) }
+                    },
+                    onImportContacts = { drafts, done ->
+                        withContactsWrite(done) {
+                            val writer = ContactWriter(this)
+                            drafts.forEach { writer.save(it) }
+                            true
+                        }
                     },
                 )
             }

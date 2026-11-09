@@ -178,4 +178,27 @@
     <string name="missed_calls">%1$d missed calls</string>
     <string name="missed_calls_open">Tap to see them in Recents</string>
     <string name="call_back">Call back</string>
+
+    <!-- Recents, call history, photos and backup -->
+    <string name="filter_all">All</string>
+    <string name="filter_missed">Missed</string>
+    <string name="no_missed_calls">No missed calls.</string>
+    <string name="clear_history_title">Clear call history</string>
+    <string name="clear_history_body">Every call in Recents will be deleted from this phone. This can\'t be undone.</string>
+    <string name="delete_number_history">Delete call history</string>
+    <string name="delete_this_call">Delete this call?</string>
+    <string name="delete_from_history">Delete from history</string>
+    <string name="delete_failed">Couldn\'t delete. Try again.</string>
+    <string name="need_write_call_log">Allow call history access to delete calls.</string>
+    <string name="add_photo">Add photo</string>
+    <string name="remove_photo">Remove photo</string>
+    <string name="contacts_backup">Contacts backup</string>
+    <string name="contacts_backup_body">Save all contacts to a .vcf file (names and numbers) that any phone can open, or bring contacts back from one.</string>
+    <string name="export_contacts">Export contacts</string>
+    <string name="import_contacts">Import contacts</string>
+    <string name="exported_contacts">Saved %1$d contacts</string>
+    <string name="export_failed">Couldn\'t save the file</string>
+    <string name="import_none">No contacts found in that file</string>
+    <string name="import_all_there">All the contacts in that file are already on your phone</string>
+    <string name="imported_contacts">Added %1$d contacts (%2$d already there)</string>
 </resources>

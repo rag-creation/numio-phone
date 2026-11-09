@@ -41,6 +41,19 @@ import com.rr.numio.phone.data.PhoneData
 import com.rr.numio.phone.ui.call.CallName
 import com.rr.numio.phone.ui.call.RingButton
 import com.rr.numio.phone.ui.common.BlockRow
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
 import com.rr.numio.phone.ui.common.DetailTopBar
 import com.rr.numio.phone.ui.common.PersonAvatar
 import com.rr.numio.phone.ui.common.SectionLabel
@@ -62,7 +75,10 @@ fun NumberDetailScreen(
     canBlock: Boolean,
     blocked: Boolean,
     onToggleBlock: () -> Unit,
+    onDeleteCalls: (List<Long>) -> Unit,
 ) {
+    // A call to delete (long-press on a history row), or -1 for the whole history
+    var confirmDelete by remember { mutableStateOf<Long?>(null) }
     val context = LocalContext.current
     val today = LocalDate.now()
     val title = contact?.name ?: name?.takeIf { it.isNotBlank() } ?: PhoneData.format(context, number)
@@ -107,7 +123,27 @@ fun NumberDetailScreen(
                 }
             }
             item { SectionLabel(stringResource(R.string.history), Modifier.padding(top = 12.dp)) }
-            items(history, key = { it.id }) { e -> HistoryRow(e, today) }
+            items(history, key = { it.id }) { e -> HistoryRow(e, today, onLongPress = { confirmDelete = e.id }) }
+            if (history.isNotEmpty()) {
+                item {
+                    Spacer(Modifier.height(12.dp))
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 24.dp, vertical = 8.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .border(1.dp, Numio.colors.ring, RoundedCornerShape(14.dp))
+                            .clickable(role = Role.Button) { confirmDelete = -1L }
+                            .padding(vertical = 14.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(painterResource(R.drawable.ic_trash), null, tint = Numio.colors.textSoft, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.delete_number_history), style = MaterialTheme.typography.labelLarge, color = Numio.colors.text)
+                    }
+                }
+            }
             if (canBlock && number.isNotBlank()) {
                 item {
                     Spacer(Modifier.height(12.dp))
@@ -117,12 +153,42 @@ fun NumberDetailScreen(
             item { Spacer(Modifier.height(24.dp)) }
         }
     }
+
+    confirmDelete?.let { which ->
+        AlertDialog(
+            onDismissRequest = { confirmDelete = null },
+            containerColor = Numio.colors.background,
+            title = {
+                Text(
+                    stringResource(if (which == -1L) R.string.delete_number_history else R.string.delete_this_call),
+                    color = Numio.colors.text,
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmDelete = null
+                    onDeleteCalls(if (which == -1L) history.map { it.id } else listOf(which))
+                }) {
+                    Text(stringResource(R.string.delete), color = Numio.colors.danger)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmDelete = null }) {
+                    Text(stringResource(R.string.cancel), color = Numio.colors.text)
+                }
+            },
+        )
+    }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun HistoryRow(e: CallEntry, today: LocalDate) {
+private fun HistoryRow(e: CallEntry, today: LocalDate, onLongPress: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 10.dp),
+        Modifier
+            .fillMaxWidth()
+            .combinedClickable(onClick = {}, onLongClick = onLongPress)
+            .padding(horizontal = 24.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(painterResource(kindIcon(e.kind)), null, tint = kindColor(e.kind), modifier = Modifier.size(18.dp))
