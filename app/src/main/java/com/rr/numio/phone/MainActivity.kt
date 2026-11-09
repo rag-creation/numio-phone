@@ -192,6 +192,7 @@ class MainActivity : ComponentActivity() {
                     onSaveContact = { draft, done ->
                         withContactsWrite(done) { ContactWriter(this).save(draft) }
                     },
+                    settings = settings,
                     onDeleteContact = { id, done ->
                         withContactsWrite(done) { ContactWriter(this).delete(id) }
                     },

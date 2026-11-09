@@ -38,6 +38,12 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.rr.numio.phone.R
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.rememberCoroutineScope
+import com.rr.numio.phone.data.AppSettings
+import com.rr.numio.phone.data.CallKind
+import kotlinx.coroutines.launch
 import androidx.compose.ui.platform.LocalContext
 import com.rr.numio.phone.data.Clip
 import com.rr.numio.phone.data.ContactNumber
@@ -93,7 +99,15 @@ fun PhoneApp(
     onOpenContact: (Contact) -> Unit,
     onSaveContact: (ContactDraft, (Boolean) -> Unit) -> Unit,
     onDeleteContact: (Long, (Boolean) -> Unit) -> Unit,
+    settings: AppSettings,
 ) {
+    val scope = rememberCoroutineScope()
+    val speedDial by settings.speedDial.collectAsState(initial = emptyMap())
+    val keypadVibrate by settings.keypadVibrate.collectAsState(initial = true)
+    val keypadTones by settings.keypadTones.collectAsState(initial = false)
+    // Speed dial key being set up (contact picker open), and a contact with several numbers to choose from
+    var speedPick by rememberSaveable { mutableStateOf<Int?>(null) }
+    var speedChoice by remember { mutableStateOf<Contact?>(null) }
     var tab by rememberSaveable { mutableStateOf(Tab.KEYPAD) }
     var showSettings by rememberSaveable { mutableStateOf(false) }
     // Details page on top of the tabs: "n:<number>" for a number, "c:<id>" for a contact
@@ -190,11 +204,58 @@ fun PhoneApp(
                     }
                 },
             )
+        } else if (speedPick != null) {
+            val digit = speedPick ?: 1
+            BackHandler { speedPick = null }
+            fun save(n: String) {
+                scope.launch { settings.setSpeedDial(digit, n) }
+                speedChoice = null
+                speedPick = null
+            }
+            ContactPickerScreen(
+                title = stringResource(R.string.speed_dial_pick_title, digit),
+                subtitle = stringResource(R.string.speed_dial_pick_hint, digit),
+                contacts = contacts,
+                onBack = { speedPick = null },
+                onPick = { c ->
+                    if (c.numbers.size == 1) save(c.numbers.first().number) else speedChoice = c
+                },
+            )
+            speedChoice?.let { c ->
+                AlertDialog(
+                    onDismissRequest = { speedChoice = null },
+                    containerColor = Numio.colors.background,
+                    title = { Text(c.name, color = Numio.colors.text) },
+                    text = {
+                        Column {
+                            c.numbers.forEach { n ->
+                                Text(
+                                    listOfNotNull(n.label, PhoneData.format(context, n.number)).joinToString(" · "),
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = Numio.colors.text,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .clickable(role = Role.Button) { save(n.number) }
+                                        .padding(vertical = 12.dp, horizontal = 4.dp),
+                                )
+                            }
+                        }
+                    },
+                    confirmButton = {},
+                    dismissButton = {
+                        TextButton(onClick = { speedChoice = null }) {
+                            Text(stringResource(R.string.cancel), color = Numio.colors.text)
+                        }
+                    },
+                )
+            }
         } else if (picker != null) {
             val number = picker.orEmpty()
             BackHandler { picker = null }
             ContactPickerScreen(
-                number = number,
+                title = stringResource(R.string.add_to_existing_title),
+                subtitle = PhoneData.format(context, number),
                 contacts = contacts,
                 onBack = { picker = null },
                 onPick = { c ->
@@ -246,6 +307,17 @@ fun PhoneApp(
                 onOpenDefaultApps = onOpenDefaultApps,
                 canFullScreen = canFullScreen,
                 onAllowFullScreen = onAllowFullScreen,
+                keypadTones = keypadTones,
+                onKeypadTones = { on -> scope.launch { settings.setKeypadTones(on) } },
+                keypadVibrate = keypadVibrate,
+                onKeypadVibrate = { on -> scope.launch { settings.setKeypadVibrate(on) } },
+                speedDial = speedDial,
+                contacts = contacts,
+                onSetSpeedDial = { d ->
+                    if (!hasContacts) onAllowContacts()
+                    speedPick = d
+                },
+                onClearSpeedDial = { d -> scope.launch { settings.setSpeedDial(d, null) } },
                 onBack = { showSettings = false },
             )
         } else {
@@ -281,8 +353,16 @@ fun PhoneApp(
                             onDialRequestUsed = onDialRequestUsed,
                             notice = notice,
                             contacts = contacts,
+                            lastDialled = entries.firstOrNull { it.kind == CallKind.OUTGOING }?.number,
+                            speedDial = speedDial,
+                            vibrate = keypadVibrate,
+                            tones = keypadTones,
                             onCall = onCall,
                             onSaveNumber = { sheet = "s:$it" },
+                            onSetUpSpeedDial = { d ->
+                                if (!hasContacts) onAllowContacts()
+                                speedPick = d
+                            },
                         )
                     }
                 }
