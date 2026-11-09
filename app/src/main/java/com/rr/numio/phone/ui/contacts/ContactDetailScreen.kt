@@ -96,7 +96,9 @@ fun ContactDetailScreen(
                 ) {
                     Column(Modifier.weight(1f)) {
                         Text(PhoneData.format(context, n.number), style = MaterialTheme.typography.bodyLarge.copy(fontFeatureSettings = "tnum"), color = Numio.colors.text)
-                        n.label?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = Numio.colors.textSoft) }
+                        // "Mobile · 🇮🇳 India" for numbers from another country
+                        val under = listOfNotNull(n.label, PhoneData.countryLabel(context, n.number)).joinToString(" · ")
+                        if (under.isNotEmpty()) Text(under, style = MaterialTheme.typography.bodySmall, color = Numio.colors.textSoft)
                     }
                     RingIconButton(R.drawable.ic_message, stringResource(R.string.message)) { onMessage(n.number) }
                     Spacer(Modifier.width(10.dp))
