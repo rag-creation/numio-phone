@@ -42,6 +42,12 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.rememberCoroutineScope
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import com.rr.numio.phone.data.VCard
+import com.rr.numio.phone.ui.common.clearPhotoCache
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import com.rr.numio.phone.data.AppSettings
 import com.rr.numio.phone.data.Blocking
 import com.rr.numio.phone.telecom.MissedCalls
@@ -104,6 +110,8 @@ fun PhoneApp(
     onSaveContact: (ContactDraft, (Boolean) -> Unit) -> Unit,
     onDeleteContact: (Long, (Boolean) -> Unit) -> Unit,
     settings: AppSettings,
+    onDeleteCalls: (List<Long>, (Boolean) -> Unit) -> Unit,
+    onImportContacts: (List<ContactDraft>, (Boolean) -> Unit) -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     val speedDial by settings.speedDial.collectAsState(initial = emptyMap())
@@ -151,6 +159,51 @@ fun PhoneApp(
             else -> R.string.unblocked_done
         }
         Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+    }
+
+    // Contacts backup: write a .vcf file, or read one back
+    val exportVcf = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/x-vcard")) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        val list = contacts
+        scope.launch {
+            val ok = withContext(Dispatchers.IO) {
+                try {
+                    context.contentResolver.openOutputStream(uri)?.use { it.write(VCard.write(list).toByteArray()) } != null
+                } catch (e: Exception) {
+                    false
+                }
+            }
+            val text = if (ok) context.getString(R.string.exported_contacts, list.size) else context.getString(R.string.export_failed)
+            Toast.makeText(context, text, Toast.LENGTH_LONG).show()
+        }
+    }
+    val importVcf = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        val existing = contacts
+        scope.launch {
+            val drafts = withContext(Dispatchers.IO) {
+                try {
+                    context.contentResolver.openInputStream(uri)?.use { VCard.read(it.readBytes().toString(Charsets.UTF_8)) }
+                } catch (e: Exception) {
+                    null
+                }
+            }
+            if (drafts.isNullOrEmpty()) {
+                Toast.makeText(context, R.string.import_none, Toast.LENGTH_LONG).show()
+                return@launch
+            }
+            val fresh = VCard.newOnly(drafts, existing)
+            if (fresh.isEmpty()) {
+                Toast.makeText(context, R.string.import_all_there, Toast.LENGTH_LONG).show()
+                return@launch
+            }
+            onImportContacts(fresh) { ok ->
+                if (ok) {
+                    val skipped = drafts.size - fresh.size
+                    Toast.makeText(context, context.getString(R.string.imported_contacts, fresh.size, skipped), Toast.LENGTH_LONG).show()
+                }
+            }
+        }
     }
 
     // The missed-call notification was tapped: open Recents
@@ -229,7 +282,10 @@ fun PhoneApp(
                     saving = true
                     onSaveContact(draft) { ok ->
                         saving = false
-                        if (ok) editor = null
+                        if (ok) {
+                            if (draft.newPhoto != null || draft.removePhoto) clearPhotoCache()
+                            editor = null
+                        }
                     }
                 },
                 onDelete = existing?.let { c ->
@@ -323,6 +379,10 @@ fun PhoneApp(
                     canBlock = canBlock,
                     blocked = isBlocked(number),
                     onToggleBlock = { setBlocked(listOf(number), !isBlocked(number)) },
+                    onDeleteCalls = { ids ->
+                        val all = ids.size == entries.count { PhoneNumbers.same(it.number, number) }
+                        onDeleteCalls(ids) { ok -> if (ok && all) detail = null }
+                    },
                 )
             } else {
                 val contact = contacts.firstOrNull { it.id.toString() == current.removePrefix("c:") }
@@ -383,6 +443,12 @@ fun PhoneApp(
                 blockedCodes = blockedCodes,
                 onAddBlockedCode = { code -> scope.launch { settings.addBlockedCode(code) } },
                 onRemoveBlockedCode = { code -> scope.launch { settings.removeBlockedCode(code) } },
+                onExportContacts = {
+                    if (!hasContacts) onAllowContacts() else exportVcf.launch("Contacts.vcf")
+                },
+                onImportContacts = {
+                    importVcf.launch(arrayOf("text/x-vcard", "text/vcard", "text/directory", "text/plain", "application/octet-stream"))
+                },
                 onBack = { showSettings = false },
             )
         } else {
@@ -402,7 +468,9 @@ fun PhoneApp(
                             onAllow = onAllowCallLog,
                             onOpen = { detail = "n:$it" },
                             onCall = onCall,
+                            onMessage = onMessage,
                             onLongPress = { sheet = "n:$it" },
+                            onClearAll = { onDeleteCalls(emptyList()) {} },
                         )
                         Tab.CONTACTS -> ContactsScreen(
                             hasPermission = hasContacts,
@@ -452,6 +520,9 @@ fun PhoneApp(
                 canBlock = canBlock,
                 isBlocked = ::isBlocked,
                 onSetBlocked = ::setBlocked,
+                onDeleteHistory = { n ->
+                    onDeleteCalls(entries.filter { PhoneNumbers.same(it.number, n) }.map { it.id }) {}
+                },
             )
         }
     }
@@ -475,6 +546,7 @@ private fun LongPressSheet(
     canBlock: Boolean,
     isBlocked: (String) -> Boolean,
     onSetBlocked: (List<String>, Boolean) -> Unit,
+    onDeleteHistory: (String) -> Unit,
 ) {
     val context = LocalContext.current
     fun blockAction(numbers: List<String>): SheetAction? {
@@ -539,6 +611,7 @@ private fun LongPressSheet(
                     addAll(saveActions(number))
                 }
                 if (number.isNotBlank()) blockAction(listOf(number))?.let { add(it) }
+                add(SheetAction(R.drawable.ic_trash, context.getString(R.string.delete_from_history)) { onDeleteHistory(number) })
             }
             ActionSheet(title, if (title != shown) shown else null, contact?.photoUri, actions, onDismiss)
         }

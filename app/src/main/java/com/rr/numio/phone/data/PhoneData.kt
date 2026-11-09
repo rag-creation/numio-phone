@@ -178,6 +178,20 @@ class PhoneData(context: Context) {
         )
     }
 
+    /** Deletes calls from the call log (needs write access). [ids] empty = every call. */
+    fun deleteCalls(ids: List<Long>): Boolean = try {
+        if (ids.isEmpty()) {
+            resolver.delete(CallLog.Calls.CONTENT_URI, null, null)
+        } else {
+            ids.chunked(200).forEach { part ->
+                resolver.delete(CallLog.Calls.CONTENT_URI, "${CallLog.Calls._ID} IN (${part.joinToString(",")})", null)
+            }
+        }
+        true
+    } catch (e: Exception) {
+        false
+    }
+
     /** Contact name for one number, used by the call screen. */
     fun nameFor(number: String): String? {
         if (!hasContacts() || number.isBlank()) return null

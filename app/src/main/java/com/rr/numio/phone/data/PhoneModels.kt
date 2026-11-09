@@ -123,6 +123,10 @@ data class ContactDraft(
     val name: String,
     val numbers: List<ContactNumber>,
     val starred: Boolean,
+    /** A picture picked from the gallery (content URI), to save as the contact photo. */
+    val newPhoto: String? = null,
+    /** True to take the current photo off. */
+    val removePhoto: Boolean = false,
 ) {
     /** Numbers worth saving: dialable characters only, empty rows dropped, no duplicates. */
     val cleanNumbers: List<ContactNumber>

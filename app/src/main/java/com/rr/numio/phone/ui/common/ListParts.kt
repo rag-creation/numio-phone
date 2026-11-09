@@ -46,21 +46,46 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.rr.numio.phone.R
 import com.rr.numio.phone.ui.theme.Numio
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.setValue
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 private val photoCache = LruCache<String, ImageBitmap>(80)
 
+// Bumped when photos are forgotten, so avatars on screen load again
+private var photoEpoch by mutableIntStateOf(0)
+
+/** Forget loaded photos, after a contact's photo was changed (its address stays the same). */
+fun clearPhotoCache() {
+    photoCache.evictAll()
+    photoEpoch++
+}
+
 /** Contact photo thumbnail, read from the phone on a background thread and cached. */
 @Composable
 fun rememberPhoto(uri: String?): ImageBitmap? {
     val context = LocalContext.current
-    val photo by produceState(uri?.let { photoCache.get(it) }, uri) {
-        if (uri == null || value != null) return@produceState
+    val epoch = photoEpoch
+    val photo by produceState(uri?.let { photoCache.get(it) }, uri, epoch) {
+        if (uri == null) {
+            value = null
+            return@produceState
+        }
+        photoCache.get(uri)?.let {
+            value = it
+            return@produceState
+        }
         value = withContext(Dispatchers.IO) {
             try {
-                context.contentResolver.openInputStream(Uri.parse(uri))?.use { s ->
-                    BitmapFactory.decodeStream(s)?.asImageBitmap()
+                // Read the size first, so a big gallery picture is loaded small (avatars are tiny)
+                val u = Uri.parse(uri)
+                val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                context.contentResolver.openInputStream(u)?.use { BitmapFactory.decodeStream(it, null, bounds) }
+                var sample = 1
+                while (minOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= 360) sample *= 2
+                context.contentResolver.openInputStream(u)?.use { s ->
+                    BitmapFactory.decodeStream(s, null, BitmapFactory.Options().apply { inSampleSize = sample })?.asImageBitmap()
                 }?.also { photoCache.put(uri, it) }
             } catch (e: Exception) {
                 null

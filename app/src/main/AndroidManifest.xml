@@ -9,6 +9,8 @@
     <!-- Recents and Contacts tabs: asked for only when you tap Allow there -->
     <uses-permission android:name="android.permission.READ_CALL_LOG" />
     <uses-permission android:name="android.permission.READ_CONTACTS" />
+    <!-- Delete calls from Recents: asked the first time you delete one -->
+    <uses-permission android:name="android.permission.WRITE_CALL_LOG" />
     <!-- Add, edit and delete contacts: asked the first time you press Save -->
     <uses-permission android:name="android.permission.WRITE_CONTACTS" />
     <!-- Lets Android hand missed calls to this app, so it can show its own
