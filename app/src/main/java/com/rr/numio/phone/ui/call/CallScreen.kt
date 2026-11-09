@@ -127,7 +127,8 @@ private fun ColumnScope.RingingScreen(call: CallInfo, locked: Boolean, clock: St
         }
         Spacer(Modifier.height(14.dp))
     }
-    CallLabel(listOfNotNull(stringResource(R.string.incoming_call), call.simLabel).joinToString(" · "))
+    val country = PhoneData.countryLabel(LocalContext.current, call.number)
+    CallLabel(listOfNotNull(stringResource(R.string.incoming_call), country, call.simLabel).joinToString(" · "))
 
     CallerBlock(call, pulsing = true, modifier = Modifier.weight(1f))
 
@@ -270,7 +271,8 @@ private fun ColumnScope.OnCallScreen(call: CallInfo, other: CallInfo?, audio: Ca
         call.isHolding -> stringResource(R.string.on_hold)
         else -> stringResource(R.string.on_call)
     }
-    CallLabel(listOfNotNull(label, call.simLabel).joinToString(" · "))
+    val country = PhoneData.countryLabel(LocalContext.current, call.number)
+    CallLabel(listOfNotNull(label, country, call.simLabel).joinToString(" · "))
 
     if (showKeypad) {
         // Small header so the tones you type stay visible

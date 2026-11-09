@@ -187,6 +187,7 @@ private fun RecentRow(group: CallGroup, photoUri: String?, onOpen: () -> Unit, o
                 val parts = buildList {
                     if (group.calls.size > 1) add("(${group.calls.size})")
                     latest.simLabel?.let { add(it) }
+                    PhoneData.countryFlag(context, group.number)?.let { add(it) }
                     add(timeText(latest.timeMillis))
                 }
                 Text(

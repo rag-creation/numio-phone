@@ -218,6 +218,14 @@ class PhoneData(context: Context) {
                 ?: Locale.getDefault().country).uppercase(Locale.ROOT)
         }
 
+        /** "🇮🇳 India" when the number is from another country than the phone is in, else null. */
+        fun countryLabel(context: Context, number: String): String? =
+            CallerCountry.label(number, countryIso(context))
+
+        /** Just the flag, same rule as [countryLabel]. */
+        fun countryFlag(context: Context, number: String): String? =
+            CallerCountry.flagFor(number, countryIso(context))
+
         /** "050 123 4567" style, using the phone's country. Falls back to the raw number. */
         fun format(context: Context, number: String): String =
             PhoneNumberUtils.formatNumber(number, countryIso(context)) ?: number

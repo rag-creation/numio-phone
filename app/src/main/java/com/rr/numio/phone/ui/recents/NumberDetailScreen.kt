@@ -85,6 +85,10 @@ fun NumberDetailScreen(
                             Spacer(Modifier.height(6.dp))
                             Text(PhoneData.format(context, number), style = MaterialTheme.typography.bodyLarge, color = Numio.colors.textSoft)
                         }
+                        PhoneData.countryLabel(context, number)?.let { country ->
+                            Spacer(Modifier.height(4.dp))
+                            Text(country, style = MaterialTheme.typography.bodyMedium, color = Numio.colors.textSoft)
+                        }
                     }
                     Spacer(Modifier.height(26.dp))
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
