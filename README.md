@@ -56,8 +56,8 @@ Nothing is asked for on first launch. Each permission is asked for only when you
 | `READ_CALL_LOG` | 2 | Show call history (read only; nothing is copied) |
 | `READ_CONTACTS` | 3 | Show names and the contact list |
 | `WRITE_CONTACTS` | 3 | Add, edit and delete contacts, asked the first time you press Save. Saved to the phone's own storage, never online |
-| `READ_PHONE_STATE` | 4 | List SIMs so you can choose one |
-| Call screening role | 5 | Block numbers before they ring |
+| `READ_PHONE_STATE` | 4 | List SIMs so you can choose one, and receive missed calls from Android so Numio can show its own missed-call notification (Call back / Message). Until it's allowed, Android's usual notification shows |
+| Call screening (comes with being the default phone app) | 5 | Block hidden numbers, callers not in contacts and whole country codes before they ring. Single numbers go on Android's own blocked list, shared with SMS apps |
 
 `INTERNET` will never be added. CI checks the release APK on every pull request and fails if it appears.
 

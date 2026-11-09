@@ -40,6 +40,7 @@ import com.rr.numio.phone.data.Contact
 import com.rr.numio.phone.data.PhoneData
 import com.rr.numio.phone.ui.call.CallName
 import com.rr.numio.phone.ui.call.RingButton
+import com.rr.numio.phone.ui.common.BlockRow
 import com.rr.numio.phone.ui.common.DetailTopBar
 import com.rr.numio.phone.ui.common.PersonAvatar
 import com.rr.numio.phone.ui.common.SectionLabel
@@ -58,6 +59,9 @@ fun NumberDetailScreen(
     onMessage: () -> Unit,
     onOpenContact: () -> Unit,
     onAddContact: () -> Unit,
+    canBlock: Boolean,
+    blocked: Boolean,
+    onToggleBlock: () -> Unit,
 ) {
     val context = LocalContext.current
     val today = LocalDate.now()
@@ -104,6 +108,12 @@ fun NumberDetailScreen(
             }
             item { SectionLabel(stringResource(R.string.history), Modifier.padding(top = 12.dp)) }
             items(history, key = { it.id }) { e -> HistoryRow(e, today) }
+            if (canBlock && number.isNotBlank()) {
+                item {
+                    Spacer(Modifier.height(12.dp))
+                    BlockRow(blocked, R.string.block_number, R.string.unblock_number, onToggleBlock)
+                }
+            }
             item { Spacer(Modifier.height(24.dp)) }
         }
     }

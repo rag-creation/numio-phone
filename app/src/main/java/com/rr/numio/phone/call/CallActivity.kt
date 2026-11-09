@@ -30,6 +30,7 @@ import com.rr.numio.phone.ui.call.CallScreen
 import com.rr.numio.phone.ui.theme.PhonebyNumioTheme
 import com.rr.numio.phone.ui.theme.ThemeMode
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import java.text.DateFormat
 import java.util.Date
@@ -119,10 +120,11 @@ class CallActivity : ComponentActivity() {
             }
         }
 
-        // Screen off when the phone is at your ear (earpiece calls only)
+        // Screen off when the phone is at your ear (earpiece calls only), unless turned off in Settings
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
-                CallManager.state.collect { updateProximity(it) }
+                combine(CallManager.state, settings.proximity) { snapshot, on -> snapshot to on }
+                    .collect { (snapshot, on) -> updateProximity(snapshot, on) }
             }
         }
     }
@@ -156,10 +158,10 @@ class CallActivity : ComponentActivity() {
         }
     }
 
-    private fun updateProximity(snapshot: CallSnapshot) {
+    private fun updateProximity(snapshot: CallSnapshot, enabled: Boolean) {
         val call = snapshot.primary
         val route = snapshot.audio?.route ?: CallAudioState.ROUTE_EARPIECE
-        val wanted = call != null && (call.isActive || call.isOutgoingStarting) &&
+        val wanted = enabled && call != null && (call.isActive || call.isOutgoingStarting) &&
             route == CallAudioState.ROUTE_EARPIECE
         val lock = proximityLock ?: run {
             val pm = getSystemService(PowerManager::class.java)

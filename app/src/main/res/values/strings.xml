@@ -148,4 +148,34 @@
     <string name="speed_dial_pick_title">Speed dial %1$d</string>
     <string name="speed_dial_pick_hint">Long-press %1$d on the keypad to call them</string>
     <string name="speed_dial_clear">Clear speed dial %1$d</string>
+
+    <!-- Calls, blocking and missed calls -->
+    <string name="calls">Calls</string>
+    <string name="proximity">Screen off at your ear</string>
+    <string name="proximity_body">Turns the screen off while the phone is held to your ear, so your cheek can\'t press buttons</string>
+    <string name="blocking">Blocking</string>
+    <string name="blocking_needs_default">Blocking works once Phone by Numio is your default phone app.</string>
+    <string name="block_private">Block hidden numbers</string>
+    <string name="block_private_body">Calls with no number shown (private or unknown)</string>
+    <string name="block_unknown">Block callers not in contacts</string>
+    <string name="block_unknown_body">Only people you\'ve saved can ring. Careful: deliveries and new numbers are blocked too</string>
+    <string name="blocked_countries">Blocked countries</string>
+    <string name="add_country_code">Block a country code</string>
+    <string name="add_country_code_body">Every call from numbers starting with this code is blocked, for example +92.</string>
+    <string name="blocked_numbers">Blocked numbers</string>
+    <string name="blocked_numbers_empty">None yet. Long-press a call or contact to block it.</string>
+    <string name="block">Block</string>
+    <string name="unblock">Unblock</string>
+    <string name="block_number">Block number</string>
+    <string name="unblock_number">Unblock number</string>
+    <string name="block_contact">Block contact</string>
+    <string name="unblock_contact">Unblock contact</string>
+    <string name="blocked_done">Blocked</string>
+    <string name="unblocked_done">Unblocked</string>
+    <string name="block_failed">Couldn\'t change the blocked list</string>
+    <string name="channel_missed">Missed calls</string>
+    <string name="missed_call">Missed call</string>
+    <string name="missed_calls">%1$d missed calls</string>
+    <string name="missed_calls_open">Tap to see them in Recents</string>
+    <string name="call_back">Call back</string>
 </resources>
