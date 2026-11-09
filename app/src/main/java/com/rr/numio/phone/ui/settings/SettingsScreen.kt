@@ -30,6 +30,19 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.rr.numio.phone.R
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.input.KeyboardType
+import com.rr.numio.phone.data.BlockRules
+import com.rr.numio.phone.data.BlockedNumber
+import com.rr.numio.phone.data.CallerCountry
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.selection.toggleable
@@ -66,9 +79,22 @@ fun SettingsScreen(
     contacts: List<Contact>,
     onSetSpeedDial: (Int) -> Unit,
     onClearSpeedDial: (Int) -> Unit,
+    proximity: Boolean,
+    onProximity: (Boolean) -> Unit,
+    canBlock: Boolean,
+    blocked: List<BlockedNumber>,
+    onUnblock: (String) -> Unit,
+    blockPrivate: Boolean,
+    onBlockPrivate: (Boolean) -> Unit,
+    blockUnknown: Boolean,
+    onBlockUnknown: (Boolean) -> Unit,
+    blockedCodes: Set<String>,
+    onAddBlockedCode: (String) -> Unit,
+    onRemoveBlockedCode: (String) -> Unit,
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
+    var addingCode by remember { mutableStateOf(false) }
     Column(
         Modifier
             .fillMaxSize()
@@ -119,6 +145,51 @@ fun SettingsScreen(
                 OutlineButton(stringResource(R.string.change_default), onOpenDefaultApps)
             } else {
                 FilledButton(stringResource(R.string.set_default), onSetDefault)
+            }
+
+            SectionLabel(stringResource(R.string.calls))
+            SettingSwitch(stringResource(R.string.proximity), stringResource(R.string.proximity_body), proximity, onProximity)
+
+            SectionLabel(stringResource(R.string.blocking))
+            if (!canBlock) {
+                Text(
+                    stringResource(R.string.blocking_needs_default),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Numio.colors.textSoft,
+                )
+            } else {
+                SettingSwitch(stringResource(R.string.block_private), stringResource(R.string.block_private_body), blockPrivate, onBlockPrivate)
+                Spacer(Modifier.height(8.dp))
+                SettingSwitch(stringResource(R.string.block_unknown), stringResource(R.string.block_unknown_body), blockUnknown, onBlockUnknown)
+
+                SubLabel(stringResource(R.string.blocked_countries))
+                blockedCodes.sortedBy { it.length.toString() + it }.forEach { code ->
+                    val iso = CallerCountry.isoFor("+${code}1234567890")
+                    BlockedItem(
+                        title = listOfNotNull(iso?.let { CallerCountry.flag(it) }, iso?.let { CallerCountry.name(it) }).joinToString(" ")
+                            .ifBlank { "+$code" },
+                        subtitle = "+$code",
+                        onRemove = { onRemoveBlockedCode(code) },
+                    )
+                }
+                TextAction(stringResource(R.string.add_country_code)) { addingCode = true }
+
+                SubLabel(stringResource(R.string.blocked_numbers))
+                if (blocked.isEmpty()) {
+                    Text(
+                        stringResource(R.string.blocked_numbers_empty),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Numio.colors.textSoft,
+                    )
+                }
+                blocked.forEach { b ->
+                    val name = contacts.firstOrNull { c -> c.numbers.any { PhoneNumbers.same(it.number, b.number) } }?.name
+                    BlockedItem(
+                        title = name ?: PhoneData.format(context, b.number),
+                        subtitle = if (name != null) PhoneData.format(context, b.number) else null,
+                        onRemove = { onUnblock(b.number) },
+                    )
+                }
             }
 
             SectionLabel(stringResource(R.string.keypad))
@@ -176,6 +247,121 @@ fun SettingsScreen(
             Spacer(Modifier.height(32.dp))
         }
     }
+
+    if (addingCode) {
+        AddCodeDialog(
+            onDismiss = { addingCode = false },
+            onAdd = { code ->
+                onAddBlockedCode(code)
+                addingCode = false
+            },
+        )
+    }
+}
+
+@Composable
+private fun SubLabel(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.titleSmall,
+        color = Numio.colors.text,
+        modifier = Modifier.padding(top = 20.dp, bottom = 6.dp),
+    )
+}
+
+@Composable
+private fun TextAction(text: String, onClick: () -> Unit) {
+    Text(
+        text,
+        style = MaterialTheme.typography.labelLarge,
+        color = Numio.colors.accentInk,
+        modifier = Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(role = Role.Button, onClick = onClick)
+            .padding(vertical = 10.dp, horizontal = 4.dp),
+    )
+}
+
+/** A blocked number or country, with × to unblock it. */
+@Composable
+private fun BlockedItem(title: String, subtitle: String?, onRemove: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge, color = Numio.colors.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (subtitle != null) {
+                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = Numio.colors.textSoft, maxLines = 1)
+            }
+        }
+        Box(
+            Modifier
+                .size(40.dp)
+                .clip(CircleShape)
+                .clickable(role = Role.Button, onClick = onRemove),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                painterResource(R.drawable.ic_close),
+                stringResource(R.string.unblock),
+                tint = Numio.colors.textSoft,
+                modifier = Modifier.size(16.dp),
+            )
+        }
+    }
+}
+
+/** Type a calling code (+92); shows which country it is before adding. */
+@Composable
+private fun AddCodeDialog(onDismiss: () -> Unit, onAdd: (String) -> Unit) {
+    var text by remember { mutableStateOf("+") }
+    val code = BlockRules.cleanCode(text)
+    val iso = code?.let { CallerCountry.isoFor("+${it}1234567890") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Numio.colors.background,
+        title = { Text(stringResource(R.string.add_country_code), color = Numio.colors.text) },
+        text = {
+            Column {
+                Text(stringResource(R.string.add_country_code_body), style = MaterialTheme.typography.bodyMedium, color = Numio.colors.textSoft)
+                Spacer(Modifier.height(12.dp))
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .border(1.dp, Numio.colors.ring, RoundedCornerShape(14.dp))
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                ) {
+                    BasicTextField(
+                        value = text,
+                        onValueChange = { v -> text = v.filter { it.isDigit() || it == '+' }.take(6) },
+                        singleLine = true,
+                        textStyle = MaterialTheme.typography.titleMedium.copy(color = Numio.colors.text),
+                        cursorBrush = SolidColor(Numio.colors.accent),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    iso?.let { CallerCountry.flag(it) + " " + CallerCountry.name(it) } ?: " ",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Numio.colors.accentInk,
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { code?.let(onAdd) }, enabled = code != null) {
+                Text(stringResource(R.string.block), color = if (code != null) Numio.colors.danger else Numio.colors.textFaint)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.cancel), color = Numio.colors.text)
+            }
+        },
+    )
 }
 
 @Composable

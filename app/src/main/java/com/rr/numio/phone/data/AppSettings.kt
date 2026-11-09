@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.rr.numio.phone.ui.theme.ThemeMode
 import kotlinx.coroutines.flow.Flow
@@ -48,4 +49,38 @@ class AppSettings(context: Context) {
     }
 
     private fun speedKey(digit: Int) = stringPreferencesKey("speed_dial_$digit")
+
+    // Turn the screen off when the phone is at your ear during a call (on by default)
+    private val proximityKey = booleanPreferencesKey("proximity_screen_off")
+    val proximity: Flow<Boolean> = store.data.map { it[proximityKey] ?: true }
+
+    suspend fun setProximity(on: Boolean) {
+        store.edit { it[proximityKey] = on }
+    }
+
+    // Call blocking rules, checked for every incoming call (single numbers live in
+    // Android's own blocked list, see Blocking)
+    private val blockPrivateKey = booleanPreferencesKey("block_private")
+    private val blockUnknownKey = booleanPreferencesKey("block_unknown")
+    private val blockedCodesKey = stringSetPreferencesKey("blocked_codes")
+
+    val blockPrivate: Flow<Boolean> = store.data.map { it[blockPrivateKey] ?: false }
+    val blockUnknown: Flow<Boolean> = store.data.map { it[blockUnknownKey] ?: false }
+    val blockedCodes: Flow<Set<String>> = store.data.map { it[blockedCodesKey] ?: emptySet() }
+
+    suspend fun setBlockPrivate(on: Boolean) {
+        store.edit { it[blockPrivateKey] = on }
+    }
+
+    suspend fun setBlockUnknown(on: Boolean) {
+        store.edit { it[blockUnknownKey] = on }
+    }
+
+    suspend fun addBlockedCode(code: String) {
+        store.edit { it[blockedCodesKey] = (it[blockedCodesKey] ?: emptySet()) + code }
+    }
+
+    suspend fun removeBlockedCode(code: String) {
+        store.edit { it[blockedCodesKey] = (it[blockedCodesKey] ?: emptySet()) - code }
+    }
 }

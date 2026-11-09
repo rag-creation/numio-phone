@@ -211,7 +211,7 @@ class PhoneData(context: Context) {
             ?: ContentUris.withAppendedId(ContactsContract.Contacts.CONTENT_URI, contact.id)
 
     companion object {
-        private fun countryIso(context: Context): String {
+        fun countryIso(context: Context): String {
             val tm = context.getSystemService(TelephonyManager::class.java)
             return (tm?.networkCountryIso?.takeIf { it.isNotBlank() }
                 ?: tm?.simCountryIso?.takeIf { it.isNotBlank() }

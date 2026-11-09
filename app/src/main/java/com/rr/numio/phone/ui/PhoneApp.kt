@@ -41,7 +41,10 @@ import com.rr.numio.phone.R
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.rememberCoroutineScope
+import android.widget.Toast
 import com.rr.numio.phone.data.AppSettings
+import com.rr.numio.phone.data.Blocking
+import com.rr.numio.phone.telecom.MissedCalls
 import com.rr.numio.phone.data.CallKind
 import kotlinx.coroutines.launch
 import androidx.compose.ui.platform.LocalContext
@@ -89,6 +92,7 @@ fun PhoneApp(
     onAllowFullScreen: () -> Unit,
     dialRequest: String?,
     onDialRequestUsed: () -> Unit,
+    recentsRequest: Int,
     notice: String?,
     onCall: (String) -> Unit,
     phone: PhoneData,
@@ -108,6 +112,10 @@ fun PhoneApp(
     // Speed dial key being set up (contact picker open), and a contact with several numbers to choose from
     var speedPick by rememberSaveable { mutableStateOf<Int?>(null) }
     var speedChoice by remember { mutableStateOf<Contact?>(null) }
+    val proximity by settings.proximity.collectAsState(initial = true)
+    val blockPrivate by settings.blockPrivate.collectAsState(initial = false)
+    val blockUnknown by settings.blockUnknown.collectAsState(initial = false)
+    val blockedCodes by settings.blockedCodes.collectAsState(initial = emptySet())
     var tab by rememberSaveable { mutableStateOf(Tab.KEYPAD) }
     var showSettings by rememberSaveable { mutableStateOf(false) }
     // Details page on top of the tabs: "n:<number>" for a number, "c:<id>" for a contact
@@ -127,6 +135,39 @@ fun PhoneApp(
     val entries by remember(permissionTick) { phone.callLog() }.collectAsState(initial = emptyList())
     val contacts by remember(permissionTick) { phone.contacts() }.collectAsState(initial = emptyList())
     val groups = remember(entries) { CallGrouping.group(entries) }
+
+    // Android's blocked list (readable only by the default phone app); re-read after a change
+    var blockTick by remember { mutableStateOf(0) }
+    val blocking = remember { Blocking(context) }
+    val canBlock = remember(isDefault, blockTick) { blocking.canBlock() }
+    val blocked = remember(isDefault, blockTick) { blocking.list() }
+    fun isBlocked(number: String) = blocked.any { it.number == number || PhoneNumbers.same(it.number, number) }
+    fun setBlocked(numbers: List<String>, block: Boolean) {
+        val ok = numbers.all { if (block) isBlocked(it) || blocking.block(it) else blocking.unblock(it) || !isBlocked(it) }
+        blockTick++
+        val message = when {
+            !ok -> R.string.block_failed
+            block -> R.string.blocked_done
+            else -> R.string.unblocked_done
+        }
+        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+    }
+
+    // The missed-call notification was tapped: open Recents
+    LaunchedEffect(recentsRequest) {
+        if (recentsRequest > 0) {
+            tab = Tab.RECENTS
+            showSettings = false
+            detail = null
+            editor = null
+            picker = null
+            sheet = null
+        }
+    }
+    // Looking at Recents counts as seeing the missed calls
+    LaunchedEffect(tab, isDefault) {
+        if (tab == Tab.RECENTS && isDefault) MissedCalls.markSeen(context)
+    }
     // A tel: link from another app always lands on the keypad
     LaunchedEffect(dialRequest) {
         if (dialRequest != null) {
@@ -279,6 +320,9 @@ fun PhoneApp(
                         contacts.firstOrNull { c -> c.numbers.any { PhoneNumbers.same(it.number, number) } }?.let(onOpenContact)
                     },
                     onAddContact = { sheet = "s:$number" },
+                    canBlock = canBlock,
+                    blocked = isBlocked(number),
+                    onToggleBlock = { setBlocked(listOf(number), !isBlocked(number)) },
                 )
             } else {
                 val contact = contacts.firstOrNull { it.id.toString() == current.removePrefix("c:") }
@@ -293,6 +337,12 @@ fun PhoneApp(
                         onMessage = onMessage,
                         onOpenInContacts = { onOpenContact(contact) },
                         onEdit = { editor = "edit:${contact.id}" },
+                        canBlock = canBlock,
+                        blocked = contact.numbers.isNotEmpty() && contact.numbers.all { isBlocked(it.number) },
+                        onToggleBlock = {
+                            val all = contact.numbers.map { it.number }
+                            setBlocked(all, !all.all { isBlocked(it) })
+                        },
                     )
                 }
             }
@@ -318,6 +368,21 @@ fun PhoneApp(
                     speedPick = d
                 },
                 onClearSpeedDial = { d -> scope.launch { settings.setSpeedDial(d, null) } },
+                proximity = proximity,
+                onProximity = { on -> scope.launch { settings.setProximity(on) } },
+                canBlock = canBlock,
+                blocked = blocked,
+                onUnblock = { n -> setBlocked(listOf(n), false) },
+                blockPrivate = blockPrivate,
+                onBlockPrivate = { on -> scope.launch { settings.setBlockPrivate(on) } },
+                blockUnknown = blockUnknown,
+                onBlockUnknown = { on ->
+                    if (on && !hasContacts) onAllowContacts()
+                    scope.launch { settings.setBlockUnknown(on) }
+                },
+                blockedCodes = blockedCodes,
+                onAddBlockedCode = { code -> scope.launch { settings.addBlockedCode(code) } },
+                onRemoveBlockedCode = { code -> scope.launch { settings.removeBlockedCode(code) } },
                 onBack = { showSettings = false },
             )
         } else {
@@ -384,6 +449,9 @@ fun PhoneApp(
                 onAddToExisting = { picker = it },
                 onViewContact = { detail = "c:${it.id}" },
                 onEditContact = { editor = "edit:${it.id}" },
+                canBlock = canBlock,
+                isBlocked = ::isBlocked,
+                onSetBlocked = ::setBlocked,
             )
         }
     }
@@ -404,8 +472,17 @@ private fun LongPressSheet(
     onAddToExisting: (String) -> Unit,
     onViewContact: (Contact) -> Unit,
     onEditContact: (Contact) -> Unit,
+    canBlock: Boolean,
+    isBlocked: (String) -> Boolean,
+    onSetBlocked: (List<String>, Boolean) -> Unit,
 ) {
     val context = LocalContext.current
+    fun blockAction(numbers: List<String>): SheetAction? {
+        if (!canBlock || numbers.isEmpty()) return null
+        val all = numbers.all(isBlocked)
+        val label = context.getString(if (all) R.string.unblock else R.string.block)
+        return SheetAction(R.drawable.ic_block, label) { onSetBlocked(numbers, !all) }
+    }
     val kind = open.substringBefore(':')
     val value = open.substringAfter(':')
 
@@ -438,6 +515,7 @@ private fun LongPressSheet(
                     }
                 }
                 add(SheetAction(R.drawable.ic_pencil, context.getString(R.string.edit_contact)) { onEditContact(contact) })
+                blockAction(contact.numbers.map { it.number })?.let { add(it) }
             }
             val subtitle = first?.let { PhoneData.format(context, it) }
             ActionSheet(contact.name, subtitle, contact.photoUri, actions, onDismiss)
@@ -460,6 +538,7 @@ private fun LongPressSheet(
                 } else {
                     addAll(saveActions(number))
                 }
+                if (number.isNotBlank()) blockAction(listOf(number))?.let { add(it) }
             }
             ActionSheet(title, if (title != shown) shown else null, contact?.photoUri, actions, onDismiss)
         }

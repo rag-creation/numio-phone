@@ -11,6 +11,9 @@
     <uses-permission android:name="android.permission.READ_CONTACTS" />
     <!-- Add, edit and delete contacts: asked the first time you press Save -->
     <uses-permission android:name="android.permission.WRITE_CONTACTS" />
+    <!-- Lets Android hand missed calls to this app, so it can show its own
+         missed-call notification with Call back and Message buttons -->
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
     <!-- Turns the screen off when the phone is at your ear during a call -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
@@ -74,5 +77,27 @@
         <receiver
             android:name=".telecom.CallActionReceiver"
             android:exported="false" />
+
+        <!-- Blocking rules (hidden numbers, unknown callers, country codes), asked by
+             Android before an incoming call rings. Only Android can bind it. -->
+        <service
+            android:name=".telecom.ScreeningService"
+            android:exported="true"
+            android:permission="android.permission.BIND_SCREENING_SERVICE">
+            <intent-filter>
+                <action android:name="android.telecom.CallScreeningService" />
+            </intent-filter>
+        </service>
+
+        <!-- Missed calls from Android. Starts off; switched on once phone-state access
+             is granted (see MissedCalls), so Android's own notification shows until then. -->
+        <receiver
+            android:name=".telecom.MissedCalls$Receiver"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.telecom.action.SHOW_MISSED_CALLS_NOTIFICATION" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>

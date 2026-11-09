@@ -38,6 +38,7 @@ import com.rr.numio.phone.data.CallGrouping
 import com.rr.numio.phone.data.Contact
 import com.rr.numio.phone.data.PhoneData
 import com.rr.numio.phone.ui.call.CallName
+import com.rr.numio.phone.ui.common.BlockRow
 import com.rr.numio.phone.ui.common.DetailTopBar
 import com.rr.numio.phone.ui.common.PersonAvatar
 import com.rr.numio.phone.ui.common.RingIconButton
@@ -60,6 +61,9 @@ fun ContactDetailScreen(
     onMessage: (String) -> Unit,
     onOpenInContacts: () -> Unit,
     onEdit: () -> Unit,
+    canBlock: Boolean,
+    blocked: Boolean,
+    onToggleBlock: () -> Unit,
 ) {
     val context = LocalContext.current
     val today = LocalDate.now()
@@ -139,6 +143,10 @@ fun ContactDetailScreen(
                 ) {
                     Text(stringResource(R.string.open_in_contacts), style = MaterialTheme.typography.labelLarge, color = Numio.colors.text)
                 }
+            }
+            if (canBlock) {
+                item { BlockRow(blocked, R.string.block_contact, R.string.unblock_contact, onToggleBlock) }
+                item { Spacer(Modifier.height(16.dp)) }
             }
         }
     }

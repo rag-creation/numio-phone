@@ -25,6 +25,7 @@ import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import com.rr.numio.phone.data.AppSettings
+import com.rr.numio.phone.telecom.MissedCalls
 import com.rr.numio.phone.data.ContactWriter
 import com.rr.numio.phone.data.PhoneData
 import com.rr.numio.phone.dialpad.DialPad
@@ -45,6 +46,8 @@ class MainActivity : ComponentActivity() {
     private var canFullScreen by mutableStateOf(true)
     private var dialRequest by mutableStateOf<String?>(null)
     private var notice by mutableStateOf<String?>(null)
+    // Bumped when the missed-call notification is tapped: the app opens on Recents
+    private var recentsRequest by mutableStateOf(0)
 
     private val phone by lazy { PhoneData(this) }
     private var permissionTick by mutableIntStateOf(0)
@@ -143,7 +146,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val settings = AppSettings(this)
-        handleDialIntent(intent)
+        if (savedInstanceState == null) handleDialIntent(intent)
 
         setContent {
             val scope = rememberCoroutineScope()
@@ -177,6 +180,7 @@ class MainActivity : ComponentActivity() {
                     },
                     dialRequest = dialRequest,
                     onDialRequestUsed = { dialRequest = null },
+                    recentsRequest = recentsRequest,
                     notice = notice,
                     onCall = { call(it) },
                     phone = phone,
@@ -211,6 +215,7 @@ class MainActivity : ComponentActivity() {
             permissionTick++
         }
         canFullScreen = CallNotifications.canFullScreen(this)
+        MissedCalls.syncReceiver(this)
         if (isDefault && notice == getString(R.string.need_default)) notice = null
     }
 
@@ -222,6 +227,20 @@ class MainActivity : ComponentActivity() {
 
     /** DIAL / VIEW with a tel: number from another app: put it on the keypad (never auto-call). */
     private fun handleDialIntent(intent: Intent?) {
+        // Buttons on the missed-call notification
+        when (intent?.action) {
+            MissedCalls.ACTION_SHOW_RECENTS -> {
+                recentsRequest++
+                return
+            }
+            MissedCalls.ACTION_CALL_BACK -> {
+                MissedCalls.markSeen(this)
+                intent.getStringExtra(MissedCalls.EXTRA_NUMBER)?.takeIf { it.isNotBlank() }?.let { call(it) }
+                // Handled once: rotating the screen mustn't call again
+                intent.action = null
+                return
+            }
+        }
         if (intent?.action != Intent.ACTION_DIAL && intent?.action != Intent.ACTION_VIEW) return
         val data = intent.data ?: return
         if (data.scheme != "tel") return
@@ -261,7 +280,8 @@ class MainActivity : ComponentActivity() {
 
     /** After becoming the default phone app, ask for notifications so incoming calls can show. */
     private fun askPermissions() {
-        val missing = neededPermissions().filterNot { has(it) }
+        // Phone-state access lets Android hand missed calls to Numio's own notification
+        val missing = (neededPermissions() + Manifest.permission.READ_PHONE_STATE).filterNot { has(it) }
         if (missing.isNotEmpty()) permissionRequest.launch(missing.toTypedArray())
     }
 

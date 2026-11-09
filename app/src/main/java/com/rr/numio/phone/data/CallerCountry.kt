@@ -53,6 +53,8 @@ object CallerCountry {
     }
 
     /** Digits after the international prefix (+, 00, or 011 in the US/Canada), else null. */
+    fun internationalDigitsOf(number: String, homeIso: String = ""): String? = internationalDigits(number, homeIso)
+
     private fun internationalDigits(number: String, homeIso: String): String? {
         val t = number.trim()
         val digits = t.filter { it.isDigit() }
