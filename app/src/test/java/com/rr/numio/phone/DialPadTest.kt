@@ -58,4 +58,47 @@ class DialPadTest {
         assertEquals("ABC", DialPad.keys[1].letters)
         assertEquals("WXYZ", DialPad.keys[8].letters)
     }
+
+    // ---- Editing in the middle with a cursor ----
+
+    @Test
+    fun insertsAtTheCursor() {
+        // 123456789 with the cursor after 3: typing 0 gives 1230456789
+        val t = DialPad.insert(com.rr.numio.phone.dialpad.Typed("123456789", 3), '0')
+        assertEquals("1230456789", t.text)
+        assertEquals(4, t.cursor)
+    }
+
+    @Test
+    fun deletesTheDigitBeforeTheCursor() {
+        val t = DialPad.deleteBefore(com.rr.numio.phone.dialpad.Typed("123456789", 3))
+        assertEquals("12456789", t.text)
+        assertEquals(2, t.cursor)
+        // Nothing before the cursor: nothing deleted
+        assertEquals("123", DialPad.deleteBefore(com.rr.numio.phone.dialpad.Typed("123", 0)).text)
+    }
+
+    @Test
+    fun plusOnlyAtTheStartWithCursor() {
+        val start = com.rr.numio.phone.dialpad.Typed("971", 0)
+        assertEquals("+971", DialPad.insert(start, '+').text)
+        assertEquals("971", DialPad.insert(com.rr.numio.phone.dialpad.Typed("971", 2), '+').text)
+        assertEquals("+971", DialPad.longPressZero(start).text)
+        assertEquals("9701", DialPad.longPressZero(com.rr.numio.phone.dialpad.Typed("971", 2)).text)
+    }
+
+    @Test
+    fun nothingGoesInFrontOfAPlus() {
+        val t = DialPad.insert(com.rr.numio.phone.dialpad.Typed("+971", 0), '5')
+        assertEquals("+5971", t.text)
+        assertEquals(2, t.cursor)
+    }
+
+    @Test
+    fun typingAtTheEndWorksAsBefore() {
+        var t = com.rr.numio.phone.dialpad.Typed.atEnd("")
+        "0501234567".forEach { t = DialPad.insert(t, it) }
+        assertEquals("0501234567", t.text)
+        assertEquals(10, t.cursor)
+    }
 }

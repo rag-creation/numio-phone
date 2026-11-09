@@ -1,6 +1,21 @@
 package com.rr.numio.phone.ui.keypad
 
 import android.view.HapticFeedbackConstants
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.keyframes
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.unit.sp
+import com.rr.numio.phone.dialpad.KeyTones
+import com.rr.numio.phone.dialpad.Typed
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -76,23 +91,42 @@ fun KeypadScreen(
     onDialRequestUsed: () -> Unit,
     notice: String?,
     contacts: List<Contact>,
+    lastDialled: String?,
+    speedDial: Map<Int, String>,
+    vibrate: Boolean,
+    tones: Boolean,
     onCall: (String) -> Unit,
     onSaveNumber: (String) -> Unit,
+    onSetUpSpeedDial: (Int) -> Unit,
 ) {
     var number by rememberSaveable { mutableStateOf("") }
+    // Where the next digit goes; at the end unless you tap inside the number
+    var cursor by rememberSaveable { mutableStateOf(0) }
     var numberMenu by remember { mutableStateOf(false) }
     val context = LocalContext.current
     // Smart dial: contacts whose name (by the letters on the keys) or number matches
     val matches = remember(number, contacts) { SmartDial.search(contacts, number) }
     val view = LocalView.current
+    val keyTones = remember { KeyTones(context) }
+    DisposableEffect(Unit) { onDispose { keyTones.release() } }
+
+    fun set(t: Typed) {
+        number = t.text
+        cursor = t.cursor
+    }
+    fun typed() = Typed(number, cursor.coerceIn(0, number.length))
+
     // A number handed over by another app (a tel: link) fills the keypad
     LaunchedEffect(dialRequest) {
         if (dialRequest != null) {
-            number = DialPad.clean(dialRequest)
+            set(Typed.atEnd(DialPad.clean(dialRequest)))
             onDialRequestUsed()
         }
     }
-    fun tap() = view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+    fun tap(key: Char? = null) {
+        if (vibrate) view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+        if (tones && key != null) keyTones.play(key)
+    }
 
     Column(
         Modifier.fillMaxSize().padding(horizontal = 28.dp),
@@ -104,34 +138,20 @@ fun KeypadScreen(
             verticalArrangement = Arrangement.Bottom,
         ) {
             matches.forEach { match ->
-                SmartDialRow(match, onClick = { tap(); onCall(match.number.number) })
+                SmartDialRow(match, onClick = { onCall(match.number.number) })
             }
             if (matches.isNotEmpty()) Spacer(Modifier.height(8.dp))
         }
 
-        // Long press the number: copy, paste or save it
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .pointerInput(Unit) {
-                    detectTapGestures(onLongPress = {
-                        view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
-                        numberMenu = true
-                    })
+        // Tap inside the number to move the cursor; long press: copy, paste or save it
+        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+            NumberField(
+                typed = typed(),
+                onCursor = { cursor = it },
+                onLongPress = {
+                    view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                    numberMenu = true
                 },
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                text = number,
-                style = NumberDisplay,
-                color = Numio.colors.text,
-                maxLines = 1,
-                overflow = TextOverflow.StartEllipsis,
-                textAlign = TextAlign.Center,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 50.dp)
-                    .semantics { contentDescription = number },
             )
             DropdownMenu(
                 expanded = numberMenu,
@@ -148,7 +168,7 @@ fun KeypadScreen(
                     numberMenu = false
                     Clip.pasteText(context)?.let { pasted ->
                         val cleaned = DialPad.clean(pasted)
-                        if (cleaned.isNotEmpty()) number = cleaned
+                        if (cleaned.isNotEmpty()) set(Typed.atEnd(cleaned))
                     }
                 }
                 if (number.isNotEmpty()) {
@@ -178,19 +198,34 @@ fun KeypadScreen(
                 horizontalArrangement = Arrangement.SpaceEvenly,
             ) {
                 row.forEach { key ->
+                    val digit = key.char.digitToIntOrNull()
                     HaloKey(
                         key = key,
+                        speedDialSet = digit != null && speedDial.containsKey(digit),
                         onClick = {
-                            tap()
-                            number = DialPad.append(number, key.char)
+                            tap(key.char)
+                            set(DialPad.insert(typed(), key.char))
                         },
-                        onLongClick = if (key.char == '0') {
-                            {
-                                tap()
-                                number = DialPad.longPressZero(number)
+                        onLongClick = when {
+                            key.char == '0' -> {
+                                {
+                                    tap('+')
+                                    set(DialPad.longPressZero(typed()))
+                                }
                             }
-                        } else {
-                            null
+                            // Speed dial: long-press 1–9 with nothing typed
+                            digit != null && digit in 1..9 && number.isEmpty() -> {
+                                {
+                                    view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                                    val saved = speedDial[digit]
+                                    when {
+                                        saved != null -> onCall(saved)
+                                        digit == 1 -> onCall(DialPad.VOICEMAIL)
+                                        else -> onSetUpSpeedDial(digit)
+                                    }
+                                }
+                            }
+                            else -> null
                         },
                     )
                 }
@@ -205,12 +240,21 @@ fun KeypadScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Spacer(Modifier.size(76.dp))
-            CallButton(onClick = { tap(); if (number.isNotEmpty()) onCall(number) })
+            CallButton(
+                onClick = { tap(); if (number.isNotEmpty()) onCall(number) },
+                // Long press: bring back the last number you dialled
+                onLongClick = {
+                    if (!lastDialled.isNullOrBlank()) {
+                        view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                        set(Typed.atEnd(DialPad.clean(lastDialled)))
+                    }
+                },
+            )
             Box(Modifier.size(76.dp), contentAlignment = Alignment.Center) {
                 if (number.isNotEmpty()) {
                     BackspaceButton(
-                        onClick = { tap(); number = DialPad.backspace(number) },
-                        onLongClick = { tap(); number = "" },
+                        onClick = { tap(); set(DialPad.deleteBefore(typed())) },
+                        onLongClick = { tap(); set(Typed("", 0)) },
                     )
                 }
             }
@@ -258,7 +302,7 @@ private fun GlowLine(wide: Boolean) {
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun HaloKey(key: DialKey, onClick: () -> Unit, onLongClick: (() -> Unit)?) {
+private fun HaloKey(key: DialKey, speedDialSet: Boolean, onClick: () -> Unit, onLongClick: (() -> Unit)?) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val colors = Numio.colors
@@ -282,11 +326,20 @@ private fun HaloKey(key: DialKey, onClick: () -> Unit, onLongClick: (() -> Unit)
         Spacer(Modifier.height(2.dp))
         // Every key keeps the same height, with or without letters
         Text(key.letters.ifEmpty { " " }, style = KeyLetters, color = colors.accentInk)
+        // Tiny amber dot: this key has a speed dial
+        Box(
+            Modifier
+                .padding(top = 2.dp)
+                .size(3.dp)
+                .clip(CircleShape)
+                .background(if (speedDialSet) colors.accent else Color.Transparent),
+        )
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun CallButton(onClick: () -> Unit) {
+private fun CallButton(onClick: () -> Unit, onLongClick: () -> Unit) {
     val description = stringResource(R.string.call)
     Box(
         Modifier
@@ -299,7 +352,7 @@ private fun CallButton(onClick: () -> Unit) {
                 .size(76.dp)
                 .clip(CircleShape)
                 .background(Numio.colors.accent)
-                .clickable(role = Role.Button, onClick = onClick)
+                .combinedClickable(role = Role.Button, onClick = onClick, onLongClick = onLongClick)
                 .semantics { contentDescription = description },
             contentAlignment = Alignment.Center,
         ) {
@@ -371,6 +424,83 @@ private fun SmartDialRow(match: SmartDialMatch, onClick: () -> Unit) {
             contentDescription = null,
             tint = Numio.colors.accent,
             modifier = Modifier.size(20.dp),
+        )
+    }
+}
+
+/**
+ * The typed number. Long numbers shrink to fit; tap inside to place a blinking amber
+ * cursor there, so a digit can be added or deleted in the middle.
+ */
+@Composable
+private fun NumberField(typed: Typed, onCursor: (Int) -> Unit, onLongPress: () -> Unit) {
+    val measurer = rememberTextMeasurer()
+    val accent = Numio.colors.accent
+    var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
+    val onCursorNow by rememberUpdatedState(onCursor)
+    val onLongPressNow by rememberUpdatedState(onLongPress)
+    val editing = typed.cursor < typed.text.length
+    val blink by rememberInfiniteTransition(label = "caret").animateFloat(
+        initialValue = 1f,
+        targetValue = 0f,
+        animationSpec = infiniteRepeatable(
+            keyframes {
+                durationMillis = 1000
+                1f at 0
+                1f at 499
+                0f at 500
+                0f at 999
+            },
+        ),
+        label = "caret",
+    )
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val maxWidth = constraints.maxWidth
+        val style = remember(typed.text, maxWidth) {
+            var size = NumberDisplay.fontSize.value
+            while (size > 24f &&
+                measurer.measure(typed.text, NumberDisplay.copy(fontSize = size.sp), softWrap = false, maxLines = 1).size.width > maxWidth
+            ) {
+                size -= 2f
+            }
+            NumberDisplay.copy(fontSize = size.sp)
+        }
+        Text(
+            text = typed.text,
+            style = style,
+            color = Numio.colors.text,
+            maxLines = 1,
+            overflow = TextOverflow.StartEllipsis,
+            textAlign = TextAlign.Center,
+            onTextLayout = { layout = it },
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 50.dp)
+                .semantics { contentDescription = typed.text }
+                .pointerInput(Unit) {
+                    detectTapGestures(
+                        onTap = { pos ->
+                            val l = layout
+                            // An over-long number is cut off at the start: cursor stays at the end
+                            if (l != null && !l.hasVisualOverflow) onCursorNow(l.getOffsetForPosition(pos))
+                        },
+                        onLongPress = { onLongPressNow() },
+                    )
+                }
+                .drawWithContent {
+                    drawContent()
+                    val l = layout
+                    if (editing && l != null && typed.cursor <= l.layoutInput.text.length) {
+                        val r = l.getCursorRect(typed.cursor)
+                        val w = 2.dp.toPx()
+                        drawRect(
+                            color = accent,
+                            topLeft = Offset(r.left - w / 2, r.top + r.height * 0.12f),
+                            size = Size(w, r.height * 0.76f),
+                            alpha = blink,
+                        )
+                    }
+                },
         )
     }
 }

@@ -5,6 +5,13 @@ package com.rr.numio.phone.dialpad
 /** One key on the dial pad: the main character and the letters printed under it. */
 data class DialKey(val char: Char, val letters: String = "")
 
+/** The typed number and where the cursor is (0 = before the first digit). */
+data class Typed(val text: String, val cursor: Int) {
+    companion object {
+        fun atEnd(text: String) = Typed(text, text.length)
+    }
+}
+
 object DialPad {
     // Long numbers (with extension or prefix codes) still fit; anything longer is a typo.
     const val MAX_LENGTH = 40
@@ -34,6 +41,37 @@ object DialPad {
     /** Long-press on 0 types "+" when the number is empty, otherwise a normal 0. */
     fun longPressZero(number: String): String =
         if (number.isEmpty()) append(number, '+') else append(number, '0')
+
+    /** Long-pressing 1 with nothing typed and no speed dial on it calls this (the SIM's voicemail). */
+    const val VOICEMAIL = "voicemail"
+
+    /**
+     * Types [c] at the cursor. Same rules as [append]; "+" only goes at the very start,
+     * and nothing can be typed in front of a leading "+".
+     */
+    fun insert(t: Typed, c: Char): Typed {
+        val cursor = t.cursor.coerceIn(0, t.text.length)
+        if (c !in allowed || t.text.length >= MAX_LENGTH) return t.copy(cursor = cursor)
+        val hasPlus = t.text.startsWith("+")
+        if (c == '+') {
+            if (cursor != 0 || hasPlus) return t.copy(cursor = cursor)
+        }
+        val at = if (hasPlus && cursor == 0) 1 else cursor
+        return Typed(t.text.substring(0, at) + c + t.text.substring(at), at + 1)
+    }
+
+    /** Long-press on 0: "+" when the cursor is at the start (and there's no "+" yet), otherwise 0. */
+    fun longPressZero(t: Typed): Typed {
+        val cursor = t.cursor.coerceIn(0, t.text.length)
+        return if (cursor == 0 && !t.text.startsWith("+")) insert(t, '+') else insert(t, '0')
+    }
+
+    /** Deletes the character just before the cursor. */
+    fun deleteBefore(t: Typed): Typed {
+        val cursor = t.cursor.coerceIn(0, t.text.length)
+        if (cursor == 0) return t.copy(cursor = 0)
+        return Typed(t.text.removeRange(cursor - 1, cursor), cursor - 1)
+    }
 
     /** Removes the last character. */
     fun backspace(number: String): String = number.dropLast(1)

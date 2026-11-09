@@ -1,5 +1,6 @@
 package com.rr.numio.phone.telecom
 
+import com.rr.numio.phone.dialpad.DialPad
 import android.annotation.SuppressLint
 import android.app.role.RoleManager
 import android.content.Context
@@ -31,7 +32,13 @@ object DialerRole {
     @SuppressLint("MissingPermission")
     fun placeCall(context: Context, number: String): Boolean = try {
         val telecom = context.getSystemService(TelecomManager::class.java)
-        telecom.placeCall(Uri.fromParts("tel", number, null), Bundle())
+        // DialPad.VOICEMAIL: Android dials the SIM's own voicemail number
+        val uri = if (number == DialPad.VOICEMAIL) {
+            Uri.fromParts("voicemail", "", null)
+        } else {
+            Uri.fromParts("tel", number, null)
+        }
+        telecom.placeCall(uri, Bundle())
         true
     } catch (e: SecurityException) {
         false

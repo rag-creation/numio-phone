@@ -135,4 +135,17 @@
     <string name="add_to_existing">Add to existing contact</string>
     <string name="add_to_existing_title">Add to which contact?</string>
     <string name="view_contact">View contact</string>
+
+    <!-- Keypad settings and speed dial -->
+    <string name="keypad_tones">Key tones</string>
+    <string name="keypad_tones_body">A short beep for each key (quiet when the phone is on silent)</string>
+    <string name="keypad_vibrate">Vibrate on keys</string>
+    <string name="keypad_vibrate_body">Works when touch vibration is on in your phone\'s settings</string>
+    <string name="speed_dial">Speed dial</string>
+    <string name="speed_dial_body">Long-press a key on the keypad to call someone. Keys with an amber dot are set.</string>
+    <string name="speed_dial_empty">Not set: tap to choose</string>
+    <string name="voicemail">Voicemail</string>
+    <string name="speed_dial_pick_title">Speed dial %1$d</string>
+    <string name="speed_dial_pick_hint">Long-press %1$d on the keypad to call them</string>
+    <string name="speed_dial_clear">Clear speed dial %1$d</string>
 </resources>

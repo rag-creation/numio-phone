@@ -36,10 +36,11 @@ import com.rr.numio.phone.ui.common.DetailTopBar
 import com.rr.numio.phone.ui.common.PersonAvatar
 import com.rr.numio.phone.ui.theme.Numio
 
-/** Pick which saved contact a number should be added to. */
+/** Pick a saved contact: to add a number to, or for a speed dial key. */
 @Composable
 fun ContactPickerScreen(
-    number: String,
+    title: String,
+    subtitle: String?,
     contacts: List<Contact>,
     onBack: () -> Unit,
     onPick: (Contact) -> Unit,
@@ -51,17 +52,19 @@ fun ContactPickerScreen(
     Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
         DetailTopBar(onBack = onBack, backLabel = stringResource(R.string.back))
         Text(
-            stringResource(R.string.add_to_existing_title),
+            title,
             style = MaterialTheme.typography.titleLarge,
             color = Numio.colors.text,
             modifier = Modifier.padding(horizontal = 24.dp),
         )
-        Text(
-            PhoneData.format(context, number),
-            style = MaterialTheme.typography.bodyMedium,
-            color = Numio.colors.accentInk,
-            modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp),
-        )
+        if (subtitle != null) {
+            Text(
+                subtitle,
+                style = MaterialTheme.typography.bodyMedium,
+                color = Numio.colors.accentInk,
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp),
+            )
+        }
         SearchField(query, onChange = { query = it })
         LazyColumn(Modifier.fillMaxSize()) {
             items(shown, key = { it.id }) { c ->
